@@ -1,0 +1,130 @@
+/*
+ * Quantum — design tokens
+ * Centralized design system values. Do not scatter arbitrary values elsewhere.
+ */
+
+:root {
+  /* ---------------------------------- Color --------------------------------- */
+  /* Surfaces */
+  --color-background: #f7f5f0;
+  --color-surface: #ffffff;
+  --color-surface-elevated: #ffffff;
+  --color-surface-muted: #f0ede5;
+
+  /* Text */
+  --color-text-primary: #1f211d;
+  --color-text-secondary: #4a4e46;
+  --color-text-muted: #7c8076;
+  --color-text-inverse: #f7f5ef;
+
+  /* Borders & lines */
+  --color-border: #ddd9cd;
+  --color-border-strong: #c7c2b2;
+
+  /* Brand — muted forest/teal accent */
+  --color-primary: #2f6b57;
+  --color-primary-hover: #275a49;
+  --color-primary-soft: #e3eee9;
+  --color-primary-soft-border: #bfd5cc;
+
+  /* Secondary — warm ochre */
+  --color-secondary: #9a7b3f;
+  --color-secondary-hover: #856a35;
+  --color-secondary-soft: #f2ecdc;
+
+  /* Semantic */
+  --color-success: #2f7d5b;
+  --color-success-soft: #e2f0e8;
+  --color-warning: #a5761c;
+  --color-warning-soft: #f6edd7;
+  --color-error: #b3483c;
+  --color-error-soft: #f7e5e2;
+
+  /* Focus */
+  --color-focus: #3a7d66;
+  --color-focus-ring: rgba(47, 107, 87, 0.28);
+
+  /* Overlay */
+  --color-overlay: rgba(23, 25, 21, 0.42);
+
+  /* Link */
+  --color-link: #2c5f4d;
+  --color-link-hover: #234e40;
+
+  /* --------------------------------- Spacing -------------------------------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-9: 96px;
+
+  /* ------------------------------- Border radius ---------------------------- */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 999px;
+
+  /* --------------------------------- Shadows -------------------------------- */
+  --shadow-xs: 0 1px 2px rgba(31, 33, 29, 0.06);
+  --shadow-sm: 0 1px 3px rgba(31, 33, 29, 0.08), 0 1px 2px rgba(31, 33, 29, 0.05);
+  --shadow-md: 0 4px 12px rgba(31, 33, 29, 0.08), 0 2px 4px rgba(31, 33, 29, 0.05);
+  --shadow-lg: 0 12px 32px rgba(31, 33, 29, 0.12), 0 4px 8px rgba(31, 33, 29, 0.06);
+  --shadow-focus: 0 0 0 3px var(--color-focus-ring);
+
+  /* -------------------------------- Typography ------------------------------ */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
+    Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, Menlo,
+    monospace;
+
+  /* Type scale (fluid where needed) */
+  --text-display: clamp(2.1rem, 4.5vw + 1rem, 3.2rem);
+  --text-h1: clamp(1.7rem, 2.6vw + 1rem, 2.25rem);
+  --text-h2: clamp(1.4rem, 1.6vw + 0.9rem, 1.75rem);
+  --text-h3: 1.25rem;
+  --text-body: 1rem;
+  --text-body-sm: 0.9375rem;
+  --text-caption: 0.8125rem;
+  --text-label: 0.75rem;
+
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.65;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --letter-spacing-tight: -0.02em;
+  --letter-spacing-label: 0.06em;
+
+  /* -------------------------------- Transitions ----------------------------- */
+  --transition-fast: 120ms ease;
+  --transition-base: 180ms ease;
+  --transition-slow: 280ms ease;
+
+  /* ------------------------------- Layout metrics --------------------------- */
+  --header-height: 64px;
+  --content-max: 1120px;
+  --content-wide: 1320px;
+  --z-header: 100;
+  --z-modal: 200;
+  --z-tooltip: 300;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
