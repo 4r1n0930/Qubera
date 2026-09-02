@@ -6,6 +6,8 @@ import { Roadmap } from '../pages/Roadmap/Roadmap'
 import { Learn } from '../pages/Learn/Learn'
 import { Playground } from '../pages/Playground/Playground'
 import { Progress } from '../pages/Progress/Progress'
+import { QuantumLabPage } from '../pages/QuantumLab/QuantumLabPage'
+import { LoginPage } from '../pages/LoginPage'
 import { NotFound } from '../pages/NotFound/NotFound'
 
 export const router = createBrowserRouter([
@@ -17,8 +19,10 @@ export const router = createBrowserRouter([
       { path: 'dashboard', element: <Dashboard /> },
       { path: 'roadmap', element: <Roadmap /> },
       { path: 'learn', element: <Learn /> },
+      { path: 'lab', element: <QuantumLabPage /> },
       { path: 'playground', element: <Playground /> },
       { path: 'progress', element: <Progress /> },
+      { path: 'login', element: <LoginPage /> },
       { path: '*', element: <NotFound /> },
     ],
   },
