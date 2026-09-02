@@ -1,0 +1,115 @@
+Purpose
+
+Authentication se related saare API endpoints define karta hai, jaise registration, login, Google login, email verification, password reset aur profile APIs.
+
+Endpoints
+POST /auth/register
+
+Purpose:
+Naya user register karta hai aur email verification code generate/send karta hai.
+
+Request:
+name, email, password
+
+Response:
+Registration successful message aur email.
+
+POST /auth/verify-email
+
+Purpose:
+Verification code ke through user ka email verify karta hai.
+
+Request:
+email, code
+
+Response:
+Verification successful hone par JWT token aur user details.
+
+POST /auth/login
+
+Purpose:
+Email aur password se user ko authenticate karta hai.
+
+Request:
+email, password
+
+Response:
+Valid credentials hone par JWT token aur user details.
+
+POST /auth/google
+
+Purpose:
+Google credential verify karke user ko login/register karta hai.
+
+Request:
+credential
+
+Response:
+JWT token aur user details.
+
+POST /auth/forgot-password
+
+Purpose:
+Password reset ke liye reset token generate karke user ko reset link bhejta hai.
+
+Request:
+email
+
+Response:
+Password reset link sent message.
+
+POST /auth/reset-password/:token
+
+Purpose:
+Valid reset token ke through user ka password change karta hai.
+
+Request:
+password
+
+Response:
+Password reset successful message.
+
+PUT /auth/update-name
+
+Purpose:
+Logged-in user ka name update karta hai.
+
+Authentication:
+protect middleware required.
+
+Request:
+name
+
+Response:
+Updated name.
+
+GET /auth/profile
+
+Purpose:
+Logged-in user ki profile information retrieve karta hai.
+
+Authentication:
+protect middleware required.
+
+Response:
+User ID, name, email, profile photo aur verification status.
+
+POST /auth/resend-code
+
+Purpose:
+Unverified user ke liye naya email verification code generate aur send karta hai.
+
+Request:
+email
+
+Response:
+New verification code sent message.
+
+Authentication Flow
+Register
+   ↓
+Verify Email
+   ↓
+JWT Token
+   ↓
+Login / Protected APIs

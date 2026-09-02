@@ -1,0 +1,51 @@
+createLesson()
+
+Purpose:
+Existing module ke andar ek naya lesson create karta hai.
+
+Process:
+
+req.body se moduleId, title, content, order aur duration receive karta hai.
+Required fields validate karta hai.
+Lesson.create() ke through lesson MongoDB mein save karta hai.
+201 response return karta hai.
+Error hone par 500 response return karta hai.
+
+Endpoint:
+
+POST /api/lessons
+
+Request Body:
+
+{
+  "moduleId": "MODULE_ID",
+  "title": "What is a Qubit?",
+  "content": "A qubit is the basic unit of quantum information.",
+  "order": 1,
+  "duration": 10
+}
+getLessonsByModule()
+
+Purpose:
+Kisi particular module ke saare lessons retrieve karta hai.
+
+Process:
+
+URL ke moduleId parameter ko receive karta hai.
+Lesson.find({ moduleId }) se us module ke lessons find karta hai.
+sort({ order: 1 }) se lessons ko sequence ke according arrange karta hai.
+Lessons ko response mein return karta hai.
+
+Endpoint:
+
+GET /api/modules/:moduleId/lessons
+
+Input:
+URL mein Module ki _id.
+
+Example:
+
+GET /api/modules/68b1a2c3d4e5f67890123456/lessons
+
+Output:
+Us particular module ke saare lessons.

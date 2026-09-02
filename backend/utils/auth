@@ -1,0 +1,43 @@
+## utils/auth.js
+
+### Purpose
+
+JWT authentication se related reusable functions provide karta hai.
+
+### Function: generateToken()
+
+**Purpose:**  
+User ke payload se JWT token generate karta hai.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| payload | Object | User ki information |
+| expiresIn | String | Token ki expiry |
+
+**Returns:**  
+JWT token as string.
+
+**Example:**
+
+generateToken({ id: user._id });
+
+---
+
+### Function: verifyToken()
+
+**Purpose:**  
+JWT token ko verify karta hai.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| token | String | JWT token |
+
+**Returns:**  
+Decoded JWT payload.
+
+**Throws:**  
+Invalid ya expired token hone par error.

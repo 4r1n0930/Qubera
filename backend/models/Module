@@ -1,0 +1,15 @@
+Purpose:
+Module ka database structure define karta hai. Ye decide karta hai ki MongoDB mein ek module ke andar kaun-kaun se fields honge aur unki validation kya hogi.
+
+Schema Fields:
+
+title → Module ka naam. String, required.
+description → Module ka description. String, required.
+order → Module ka sequence/order. Number, required aur unique.
+difficulty → Module ka difficulty level. Beginner, Intermediate, ya Advanced.
+estimatedTime → Module complete karne ka estimated time, minutes mein. Number, required.
+isPublished → Module users ko visible hai ya nahi. Boolean, default true.
+timestamps → Automatically createdAt aur updatedAt fields create karta hai.
+
+Export:
+Module Mongoose model export hota hai, jise controllers database operations ke liye use karte hain.
