@@ -1,18 +1,12 @@
-import { PageHeader, EmptyState } from '../../components/common'
+import { BookOpen } from 'lucide-react'
+import { PlaceholderPage } from '../../components/dashboard/PlaceholderPage'
 
 export function Learn() {
   return (
-    <div>
-      <PageHeader
-        overline="Structured learning"
-        title="Learn"
-        description="Structured modules that follow the Understand → Visualize → Experiment journey."
-      />
-      <EmptyState
-        icon="learn"
-        title="Learning modules coming soon"
-        description="Qubits, superposition, measurement, gates, entanglement, circuits and algorithms will be taught here."
-      />
-    </div>
+    <PlaceholderPage
+      icon={BookOpen}
+      title="Learn"
+      description="Structured modules covering qubits, superposition, measurement, gates, entanglement, circuits and algorithms are built here."
+    />
   )
 }

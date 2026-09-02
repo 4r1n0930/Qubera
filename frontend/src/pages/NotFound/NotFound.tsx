@@ -1,18 +1,12 @@
-import { PageHeader, EmptyState } from '../../components/common'
+import { FileQuestion } from 'lucide-react'
+import { PlaceholderPage } from '../../components/dashboard/PlaceholderPage'
 
 export function NotFound() {
   return (
-    <div>
-      <PageHeader
-        overline="Error 404"
-        title="Page not found"
-        description="The page you're looking for doesn't exist or has moved."
-      />
-      <EmptyState
-        icon="close"
-        title="Nothing here"
-        description="Try navigating from the top menu to get back to your learning path."
-      />
-    </div>
+    <PlaceholderPage
+      icon={FileQuestion}
+      title="Page not found"
+      description="The page you're looking for doesn't exist or has moved. Use the sidebar to get back on track."
+    />
   )
 }
