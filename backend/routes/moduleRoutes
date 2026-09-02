@@ -1,0 +1,10 @@
+Purpose:
+Module-related API endpoints ko corresponding controller functions ke saath connect karta hai.
+
+Endpoints
+Method	Endpoint	Purpose
+POST	/api/modules	Naya module create karta hai
+GET	/api/modules	Saare modules fetch karta hai
+GET	/api/modules/:moduleId/lessons	Specific module ke lessons fetch karta hai
+
+Last endpoint getLessonsByModule() controller ko call karta hai.

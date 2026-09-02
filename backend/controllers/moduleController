@@ -1,0 +1,51 @@
+Purpose:
+Module-related requests ka actual business logic handle karta hai.
+
+createModule()
+
+Purpose:
+Naya module create karke MongoDB mein save karta hai.
+
+Request Data:
+
+title
+description
+order
+difficulty
+estimatedTime
+
+Process:
+
+req.body se module ki information receive karta hai.
+Required fields ki validation karta hai.
+Module.create() ke through MongoDB mein module save karta hai.
+Success par 201 response return karta hai.
+Error hone par 500 response return karta hai.
+
+Endpoint:
+POST /api/modules
+
+Success Response:
+Created module aur success message return karta hai.
+
+getModules()
+
+Purpose:
+MongoDB se saare available modules retrieve karta hai.
+
+Process:
+
+Module.find() se modules fetch karta hai.
+sort({ order: 1 }) ke through modules ko sequence/order ke according ascending order mein arrange karta hai.
+Modules ko JSON response ke through frontend/client ko return karta hai.
+Error hone par 500 response return karta hai.
+
+Endpoint:
+
+GET /api/modules
+
+Input:
+Koi request body required nahi hai.
+
+Output:
+Saare modules ordered format mein return hote hain.

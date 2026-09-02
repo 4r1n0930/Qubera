@@ -1,0 +1,33 @@
+## middleware/authMiddleware.js
+
+### Purpose
+
+Protected routes ko unauthorized users se secure karta hai.
+
+### Function: protect()
+
+**Purpose:**  
+Request ke JWT token ko validate karta hai.
+
+**Parameters:**
+
+- `req` → Express Request
+- `res` → Express Response
+- `next` → Next middleware
+
+**Process:**
+
+1. Authorization header check karta hai.
+2. `Bearer <token>` se token extract karta hai.
+3. `verifyToken()` ke through token verify karta hai.
+4. Decoded user information ko `req.user` me store karta hai.
+5. Valid token hone par `next()` call karta hai.
+
+**Success Response:**
+
+Request controller tak continue hoti hai.
+
+**Failure Response:**
+
+```text
+401 Unauthorized
