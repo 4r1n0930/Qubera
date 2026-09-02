@@ -1,0 +1,294 @@
+# Progress Router Documentation
+
+## File
+
+`routes/progressRouter.js`
+
+## Purpose
+
+`progressRouter.js` logged-in user ki **module-level learning progress** ko manage karta hai.
+
+Progress ko lesson level par nahi, **module level par** track kiya ja raha hai.
+
+Example:
+
+```text
+User → Quantum Gates → 60% → In Progress
+User → Qubits and Quantum States → 100% → Completed
+```
+
+---
+
+## Authentication
+
+Saare Progress endpoints protected hain.
+
+`protect` middleware JWT token verify karta hai aur decoded token se:
+
+```js
+req.user.userId
+```
+
+available karata hai.
+
+User ID request body se nahi li jaati.
+
+---
+
+# Endpoints
+
+## 1. Update Module Progress
+
+### Endpoint
+
+```http
+PUT /progress/:moduleId
+```
+
+### Authentication
+
+Required.
+
+```http
+Authorization: Bearer <JWT_TOKEN>
+```
+
+### Request Body
+
+```json
+{
+  "progress": 60
+}
+```
+
+### Parameters
+
+| Parameter  | Type     | Description                             |
+| ---------- | -------- | --------------------------------------- |
+| `moduleId` | ObjectId | Jis module ki progress update karni hai |
+| `progress` | Number   | Progress percentage, 0–100              |
+
+### Status Logic
+
+Progress ke according status automatically set hota hai:
+
+```text
+0       → Not Started
+1–99    → In Progress
+100     → Completed
+```
+
+Agar progress `100` hoti hai, `completedAt` mein current date/time store hota hai.
+
+### Example
+
+```http
+PUT /progress/68b123abc456
+```
+
+```json
+{
+  "progress": 75
+}
+```
+
+### Response
+
+```json
+{
+  "message": "Progress updated successfully",
+  "progress": {
+    "userId": "...",
+    "moduleId": "68b123abc456",
+    "progress": 75,
+    "status": "In Progress"
+  }
+}
+```
+
+### Special Behavior
+
+`findOneAndUpdate()` ke saath `upsert: true` use kiya gaya hai.
+
+Iska matlab:
+
+* Progress document exist karta hai → update hoga.
+* Progress document exist nahi karta → automatically create hoga.
+
+---
+
+# 2. Get Specific Module Progress
+
+### Endpoint
+
+```http
+GET /progress/:moduleId
+```
+
+### Authentication
+
+Required.
+
+### Purpose
+
+Logged-in user ki kisi specific module ki progress retrieve karta hai.
+
+### Example
+
+```http
+GET /progress/68b123abc456
+```
+
+### Response
+
+```json
+{
+  "_id": "...",
+  "userId": "...",
+  "moduleId": {
+    "_id": "68b123abc456",
+    "title": "Quantum Gates"
+  },
+  "progress": 75,
+  "status": "In Progress"
+}
+```
+
+`moduleId` ko module ke `title` ke saath populate kiya jata hai.
+
+---
+
+# 3. Get All Module Progress
+
+### Endpoint
+
+```http
+GET /progress
+```
+
+### Authentication
+
+Required.
+
+### Purpose
+
+Logged-in user ki **saare modules ki progress** retrieve karta hai.
+
+### Example Response
+
+```json
+[
+  {
+    "moduleId": {
+      "title": "Introduction to Quantum Computing",
+      "order": 1,
+      "difficulty": "Beginner"
+    },
+    "progress": 100,
+    "status": "Completed"
+  },
+  {
+    "moduleId": {
+      "title": "Quantum Gates",
+      "order": 4,
+      "difficulty": "Beginner"
+    },
+    "progress": 60,
+    "status": "In Progress"
+  }
+]
+```
+
+Modules ko `order` ke according sort karne ka purpose learning sequence maintain karna hai.
+
+---
+
+# Error Responses
+
+### 401 — Unauthorized
+
+JWT token missing ya invalid hone par:
+
+```json
+{
+  "message": "Not authorized, no token"
+}
+```
+
+ya:
+
+```json
+{
+  "message": "Not authorized, invalid token"
+}
+```
+
+### 400 — Invalid Progress
+
+Agar progress `0–100` ke bahar ho:
+
+```json
+{
+  "message": "Progress must be between 0 and 100"
+}
+```
+
+### 404 — Progress Not Found
+
+Agar specific module ki progress exist nahi karti:
+
+```json
+{
+  "message": "Progress not found"
+}
+```
+
+### 500 — Server Error
+
+Database ya server-side error hone par:
+
+```json
+{
+  "message": "Server error"
+}
+```
+
+---
+
+## Database Relationship
+
+Progress collection mein:
+
+```text
+User
+  │
+  │ userId
+  ▼
+Progress
+  │
+  │ moduleId
+  ▼
+Module
+```
+
+Ek user aur ek module ka **sirf ek Progress document** hoga.
+
+```text
+User A + Module 1 → One Progress Document
+User A + Module 2 → One Progress Document
+User B + Module 1 → One Progress Document
+```
+
+Iske liye `userId + moduleId` par unique compound index use kiya gaya hai.
+
+---
+
+## Summary
+
+| Method | Endpoint              | Purpose                       |
+| ------ | --------------------- | ----------------------------- |
+| PUT    | `/progress/:moduleId` | Module progress create/update |
+| GET    | `/progress/:moduleId` | Specific module ki progress   |
+| GET    | `/progress`           | User ki saari module progress |
+
+**Progress module-level hai**, isliye current schema mein `lessonId` nahi rakha gaya hai.

@@ -1,0 +1,31 @@
+Purpose
+
+User ka MongoDB schema define karta hai. Authentication, Google login, email verification aur password reset ke liye user data store karta hai.
+
+
+Purpose:
+User save hone se pehle password ko bcrypt se hash karta hai.
+
+Process:
+
+Check karta hai password modify hua hai ya nahi.
+Salt generate karta hai.
+Password ko hash karta hai.
+Hashed password ko database me save karta hai.
+Function: comparePassword()
+
+Purpose:
+Login ke time entered password ko stored hashed password se compare karta hai.
+
+Parameters:
+
+candidatePassword → User ka entered password.
+
+Returns:
+
+true → Password match
+false → Password match nahi hua.
+
+Export
+
+User Mongoose model ko export karta hai, jise controllers/database operations me use kiya jaata hai.

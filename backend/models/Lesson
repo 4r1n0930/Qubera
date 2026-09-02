@@ -1,0 +1,20 @@
+Purpose:
+Module ke andar available lessons ka MongoDB structure define karta hai.
+
+Fields:
+
+moduleId → Lesson kis Module se belong karta hai uski reference.
+title → Lesson ka title.
+content → Lesson ka actual learning content.
+order → Module ke andar lesson ka sequence.
+duration → Lesson complete karne ka estimated time in minutes.
+isPublished → Lesson published hai ya nahi.
+timestamps → createdAt aur updatedAt automatically generate karta hai.
+moduleId
+moduleId: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "Module",
+  required: true,
+}
+
+Ye Module collection ke _id ko reference karta hai.
