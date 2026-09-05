@@ -5,9 +5,17 @@
  * to guarantee instantaneous and reliable client-side execution.
  */
 
-import type { CircuitState, ExecutionResult, BackendType } from '../types/quantumLab'
+import type { CircuitState, ExecutionResult, BackendType, Framework } from '../types/quantumLab'
 import { simulateCircuit } from '../utils/quantumSimulator'
 import { parsePythonCode, type ParseResult } from '../utils/codeSync'
+import { codeToIrApi } from './conversionApi'
+
+const BACKEND_TO_FRAMEWORK: Record<BackendType, Framework> = {
+  qiskit: 'qiskit',
+  cirq: 'cirq',
+  pennylane: 'pennylane',
+  openqasm: 'openqasm3',
+}
 
 export interface ExecutePayload {
   backend: BackendType
@@ -52,27 +60,19 @@ export async function executeCircuitApi(payload: ExecutePayload): Promise<Execut
 }
 
 /**
- * Parses Python code into normalized Circuit JSON via API or local parser.
+ * Parses code into normalized Circuit JSON via the Node conversion service.
+ * Falls back to the bundled local parser when the service is unreachable.
  */
 export async function parseCodeApi(payload: ParsePayload): Promise<ParseResult> {
   try {
-    const response = await fetch('/api/quantum/parse', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        code: payload.code,
-        backend: payload.backend,
-      }),
+    const result = await codeToIrApi({
+      code: payload.code,
+      framework: BACKEND_TO_FRAMEWORK[payload.backend],
+      lastValidCircuit: payload.lastValidCircuit,
     })
-
-    if (response.ok) {
-      const data = await response.json()
-      return data
-    }
+    return result
   } catch {
-    // Standalone fallback
+    // Standalone / fully-offline fallback
   }
 
   // Local parser fallback
