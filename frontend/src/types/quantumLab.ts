@@ -9,9 +9,9 @@ export type BackendType = 'qiskit' | 'cirq' | 'pennylane' | 'openqasm'
 export type GateCategory =
   | 'GENERAL'
   | 'ROTATION'
-  | 'CONTROLLED'
+  | 'TWO_QUBIT'
   | 'MULTI_QUBIT'
-  | 'MEASURE'
+  | 'OPERATIONS'
 
 export type GateType =
   | 'I'
@@ -28,13 +28,16 @@ export type GateType =
   | 'RY'
   | 'RZ'
   | 'P'
-  | 'CNOT'
+  | 'CX'
   | 'CZ'
+  | 'SWAP'
+  | 'RXX'
+  | 'RZZ'
   | 'CCX'
   | 'CCZ'
-  | 'CSWAP'
-  | 'SWAP'
   | 'M'
+  | 'RESET'
+  | 'BARRIER'
 
 export interface GateDefinition {
   type: GateType
@@ -44,6 +47,7 @@ export interface GateDefinition {
   qubitsRequired: number
   description: string
   matrixSummary?: string
+  params?: { name: string; default: number; label?: string }[]
 }
 
 export interface GateOperation {
@@ -51,6 +55,7 @@ export interface GateOperation {
   gate: GateType
   targets: number[] // [0] for single qubit; [control, target] for multi-qubit
   moment: number // column/time step index (0, 1, 2, ...)
+  params?: { [key: string]: number }
 }
 
 export interface CircuitState {
@@ -207,6 +212,7 @@ export const GATE_CATALOG: GateDefinition[] = [
     qubitsRequired: 1,
     description: 'Rotation about the X axis by angle θ.',
     matrixSummary: 'R_x(θ)',
+    params: [{ name: 'theta', default: Math.PI / 2, label: 'θ' }],
   },
   {
     type: 'RY',
@@ -216,6 +222,7 @@ export const GATE_CATALOG: GateDefinition[] = [
     qubitsRequired: 1,
     description: 'Rotation about the Y axis by angle θ.',
     matrixSummary: 'R_y(θ)',
+    params: [{ name: 'theta', default: Math.PI / 2, label: 'θ' }],
   },
   {
     type: 'RZ',
@@ -225,6 +232,7 @@ export const GATE_CATALOG: GateDefinition[] = [
     qubitsRequired: 1,
     description: 'Rotation about the Z axis by angle θ.',
     matrixSummary: 'R_z(θ)',
+    params: [{ name: 'theta', default: Math.PI / 2, label: 'θ' }],
   },
   {
     type: 'P',
@@ -234,14 +242,15 @@ export const GATE_CATALOG: GateDefinition[] = [
     qubitsRequired: 1,
     description: 'Generalized phase gate: applies e^(iλ) to the |1⟩ state.',
     matrixSummary: '[[1, 0], [0, e^(iλ)]]',
+    params: [{ name: 'lambda', default: Math.PI / 2, label: 'λ' }],
   },
 
-  // Controlled
+  // Two Qubit
   {
-    type: 'CNOT',
+    type: 'CX',
     name: 'Controlled-NOT (CX)',
     symbol: '⊕',
-    category: 'CONTROLLED',
+    category: 'TWO_QUBIT',
     qubitsRequired: 2,
     description: 'Flips the target qubit if the control qubit is |1⟩.',
   },
@@ -249,15 +258,45 @@ export const GATE_CATALOG: GateDefinition[] = [
     type: 'CZ',
     name: 'Controlled-Z',
     symbol: 'CZ',
-    category: 'CONTROLLED',
+    category: 'TWO_QUBIT',
     qubitsRequired: 2,
     description: 'Applies a phase flip to the |11⟩ state.',
   },
   {
+    type: 'SWAP',
+    name: 'Swap',
+    symbol: '✕',
+    category: 'TWO_QUBIT',
+    qubitsRequired: 2,
+    description: 'Exchanges the quantum states of two qubits.',
+  },
+  {
+    type: 'RXX',
+    name: 'RXX (Rotation-XX)',
+    symbol: 'RXX',
+    category: 'TWO_QUBIT',
+    qubitsRequired: 2,
+    description: 'Two-qubit rotation about the XX axis by angle θ.',
+    matrixSummary: 'R_xx(θ)',
+    params: [{ name: 'theta', default: Math.PI / 2, label: 'θ' }],
+  },
+  {
+    type: 'RZZ',
+    name: 'RZZ (Rotation-ZZ)',
+    symbol: 'RZZ',
+    category: 'TWO_QUBIT',
+    qubitsRequired: 2,
+    description: 'Two-qubit rotation about the ZZ axis by angle θ.',
+    matrixSummary: 'R_zz(θ)',
+    params: [{ name: 'theta', default: Math.PI / 2, label: 'θ' }],
+  },
+
+  // Multi Qubit
+  {
     type: 'CCX',
     name: 'Toffoli (CCX)',
     symbol: 'CCX',
-    category: 'CONTROLLED',
+    category: 'MULTI_QUBIT',
     qubitsRequired: 3,
     description: 'Flips target if both control qubits are |1⟩.',
   },
@@ -265,44 +304,42 @@ export const GATE_CATALOG: GateDefinition[] = [
     type: 'CCZ',
     name: 'Controlled-Controlled-Z',
     symbol: 'CCZ',
-    category: 'CONTROLLED',
+    category: 'MULTI_QUBIT',
     qubitsRequired: 3,
     description: 'Applies a phase flip when all three qubits are |1⟩.',
   },
-  {
-    type: 'CSWAP',
-    name: 'Fredkin (CSWAP)',
-    symbol: 'CSWAP',
-    category: 'CONTROLLED',
-    qubitsRequired: 3,
-    description: 'Swaps the two target qubits if the control qubit is |1⟩.',
-  },
 
-  // Multi-qubit
-  {
-    type: 'SWAP',
-    name: 'Swap',
-    symbol: '✕',
-    category: 'MULTI_QUBIT',
-    qubitsRequired: 2,
-    description: 'Exchanges the quantum states of two qubits.',
-  },
-
-  // Measure
+  // Operations
   {
     type: 'M',
     name: 'Measurement',
     symbol: 'M',
-    category: 'MEASURE',
+    category: 'OPERATIONS',
     qubitsRequired: 1,
     description: 'Collapses the quantum state into a classical bit outcome.',
+  },
+  {
+    type: 'RESET',
+    name: 'Reset',
+    symbol: '|0⟩',
+    category: 'OPERATIONS',
+    qubitsRequired: 1,
+    description: 'Resets a qubit to the |0⟩ state.',
+  },
+  {
+    type: 'BARRIER',
+    name: 'Barrier',
+    symbol: '▮',
+    category: 'OPERATIONS',
+    qubitsRequired: 1,
+    description: 'Prevents gate optimization across it (visual separator).',
   },
 ]
 
 export const GATE_CATEGORIES: { label: string; value: GateCategory }[] = [
-  { label: 'General Gates', value: 'GENERAL' },
-  { label: 'Rotation', value: 'ROTATION' },
-  { label: 'Controlled', value: 'CONTROLLED' },
-  { label: 'Multi-Qubit', value: 'MULTI_QUBIT' },
-  { label: 'Measure', value: 'MEASURE' },
+  { label: 'Single Qubit', value: 'GENERAL' },
+  { label: 'Rotations', value: 'ROTATION' },
+  { label: 'Two Qubit', value: 'TWO_QUBIT' },
+  { label: 'Multi Qubit', value: 'MULTI_QUBIT' },
+  { label: 'Operations', value: 'OPERATIONS' },
 ]

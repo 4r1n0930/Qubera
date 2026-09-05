@@ -10,13 +10,27 @@ GATE_MAP = {
     "Z": qml.PauliZ,
     "H": qml.Hadamard,
     "S": qml.S,
+    "Sdg": qml.adjoint(qml.S),
     "T": qml.T,
+    "Tdg": qml.adjoint(qml.T),
+    "RX": qml.RX,
+    "RY": qml.RY,
+    "RZ": qml.RZ,
+    "P": qml.PhaseShift,
     "CNOT": qml.CNOT,
+    "CX": qml.CNOT,
     "CZ": qml.CZ,
     "SWAP": qml.SWAP,
+    "RXX": qml.IsingXX,
+    "RZZ": qml.IsingZZ,
+    "CCX": qml.Toffoli,
+    "CCZ": qml.CCZ,
 }
 
-TWO_QUBIT_GATES = {"CNOT", "CZ", "SWAP"}
+TWO_QUBIT_GATES = {"CNOT", "CX", "CZ", "SWAP"}
+THREE_QUBIT_GATES = {"CCX", "CCZ"}
+PARAMETERIZED_GATES = {"RX", "RY", "RZ", "P", "RXX", "RZZ"}
+OPERATION_GATES = {"measure", "reset", "barrier"}
 
 
 class PennyLaneBackend(QuantumBackend):
@@ -30,9 +44,22 @@ class PennyLaneBackend(QuantumBackend):
         @qml.qnode(dev)
         def qnode():
             for op in circuit.operations:
+                if op.gate in OPERATION_GATES:
+                    if op.gate == "reset":
+                        for t in op.targets:
+                            m = qml.measure(t)
+                            qml.cond(m, qml.X)(t)
+                    continue
+
                 gate = GATE_MAP[op.gate]
                 targets = op.targets
-                if op.gate in TWO_QUBIT_GATES:
+                params = list(getattr(op, "params", []))
+
+                if op.gate in PARAMETERIZED_GATES:
+                    gate(*params, wires=targets if len(targets) > 1 else targets[0])
+                elif op.gate in THREE_QUBIT_GATES:
+                    gate(wires=targets)
+                elif op.gate in TWO_QUBIT_GATES:
                     gate(wires=targets)
                 else:
                     gate(wires=targets[0])

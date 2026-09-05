@@ -36,6 +36,17 @@ The canonical circuit representation:
 }
 ```
 
+Parameterized gates add a `params` array (angles in radians):
+
+```json
+{
+  "num_qubits": 1,
+  "operations": [
+    {"gate": "RX", "targets": [0], "params": [3.141592653589793]}
+  ]
+}
+```
+
 ## Bit Ordering Convention
 
 All backends normalize their output to the same bit ordering:
@@ -63,8 +74,12 @@ code or parse code back into IR.
 
 Supported gates:
 
-- Single-qubit: `I`, `X`, `Y`, `Z`, `H`, `S`, `T` (exactly 1 target)
-- Two-qubit: `CNOT`, `CZ`, `SWAP` (exactly 2 distinct targets)
+- Single-qubit: `I`, `X`, `Y`, `Z`, `H`, `S`, `Sdg`, `T`, `Tdg` (exactly 1 target)
+- Rotations: `RX`, `RY`, `RZ`, `P` (exactly 1 target, 1 angle in radians)
+- Two-qubit: `CNOT`, `CX` (alias), `CZ`, `SWAP` (exactly 2 distinct targets)
+- Two-qubit rotations: `RXX`, `RZZ` (exactly 2 distinct targets, 1 angle in radians)
+- Multi-qubit: `CCX`, `CCZ` (exactly 3 distinct targets)
+- Operations: `measure`, `reset`, `barrier` (no target-count restrictions; `reset`/`barrier` may take optional targets)
 
 ### Output
 
@@ -84,6 +99,7 @@ Supported gates:
 - `INVALID_QUBIT` — invalid `num_qubits` or out-of-range target
 - `INVALID_GATE` — unsupported gate
 - `INVALID_GATE_TARGETS` — wrong number / duplicate targets for a gate
+- `INVALID_GATE_PARAMS` — missing / wrong number of parameters for a parameterized gate
 - `INVALID_CIRCUIT` — malformed circuit
 - `CIRCUIT_EXECUTION_ERROR` — backend execution failure
 
@@ -153,12 +169,21 @@ circuit.append(cirq.measure(*qubits, key="result"))
 
 Gate operations recognized in each framework are mapped to the normalized gates:
 
-- Single-qubit: `i`/`qml.Identity`/`cirq.I` -> `I`, `x`/`qml.PauliX`/`cirq.X` -> `X`,
+- Single-qubit: `i`/`id`/`qml.Identity`/`cirq.I` -> `I`, `x`/`qml.PauliX`/`cirq.X` -> `X`,
   `y`/`qml.PauliY`/`cirq.Y` -> `Y`, `z`/`qml.PauliZ`/`cirq.Z` -> `Z`,
   `h`/`qml.Hadamard`/`cirq.H` -> `H`, `s`/`qml.S`/`cirq.S` -> `S`,
-  `t`/`qml.T`/`cirq.T` -> `T`
-- Two-qubit: `cx`/`qml.CNOT`/`cirq.CNOT` -> `CNOT`, `cz`/`qml.CZ`/`cirq.CZ` -> `CZ`,
+  `sdg`/`qml.adjoint(qml.S)`/`cirq.S**-1` -> `Sdg`,
+  `t`/`qml.T`/`cirq.T` -> `T`, `tdg`/`qml.adjoint(qml.T)`/`cirq.T**-1` -> `Tdg`
+- Rotations: `rx(theta, q)`/`qml.RX`/`cirq.rx` -> `RX`, `ry`/`qml.RY`/`cirq.ry` -> `RY`,
+  `rz`/`qml.RZ`/`cirq.rz` -> `RZ`, `p`/`qml.PhaseShift`/`cirq.Z**t` -> `P` (angle in radians)
+- Two-qubit: `cx`/`qml.CNOT`/`cirq.CNOT` -> `CNOT` (or `CX`), `cz`/`qml.CZ`/`cirq.CZ` -> `CZ`,
   `swap`/`qml.SWAP`/`cirq.SWAP` -> `SWAP`
+- Two-qubit rotations: `rxx`/`qml.IsingXX`/`cirq.XXPowGate` -> `RXX`,
+  `rzz`/`qml.IsingZZ`/`cirq.ZZPowGate` -> `RZZ` (angle in radians)
+- Multi-qubit: `ccx`/`qml.Toffoli`/`cirq.TOFFOLI` -> `CCX`,
+  `ccz`/`qml.CCZ`/`cirq.CCZ` -> `CCZ`
+- Operations: `measure_all`/`qml.counts()`/`cirq.measure` -> `measure`,
+  `reset`/`qml.measure`+`qml.cond`/`cirq.reset` -> `reset`, `barrier` -> `barrier`
 
 ### Output
 
@@ -174,6 +199,7 @@ Gate operations recognized in each framework are mapped to the normalized gates:
 - `INVALID_QUBIT` — invalid num_qubits or out-of-range qubit index
 - `INVALID_GATE` — unsupported gate for the framework
 - `INVALID_GATE_TARGETS` — wrong number or duplicate targets
+- `INVALID_GATE_PARAMS` — missing / wrong number of parameters for a parameterized gate
 
 ### Example
 
@@ -251,6 +277,7 @@ be regenerated for any framework without modification. The generation layer
 - `INVALID_QUBIT` — invalid num_qubits or out-of-range target
 - `INVALID_GATE` — unsupported gate
 - `INVALID_GATE_TARGETS` — wrong number or duplicate targets
+- `INVALID_GATE_PARAMS` — missing / wrong number of parameters for a parameterized gate
 
 ### Example
 

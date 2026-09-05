@@ -64,6 +64,10 @@ export function generatePythonCode(
     for (const op of sortedOps) {
       const q0 = op.targets[0] ?? 0
       const q1 = op.targets[1] ?? (q0 + 1)
+      const q2 = op.targets[2] ?? (q1 + 1)
+      const th = op.params && typeof op.params['theta'] === 'number' ? op.params['theta'] : Math.PI / 2
+      const lam = op.params && typeof op.params['lambda'] === 'number' ? op.params['lambda'] : Math.PI / 2
+      const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(4))
 
       switch (op.gate) {
         case 'I':
@@ -84,10 +88,31 @@ export function generatePythonCode(
         case 'S':
           addLine(`qc.s(${q0})`, op.id)
           break
+        case 'SDG':
+          addLine(`qc.sdg(${q0})`, op.id)
+          break
         case 'T':
           addLine(`qc.t(${q0})`, op.id)
           break
-        case 'CNOT':
+        case 'TDG':
+          addLine(`qc.tdg(${q0})`, op.id)
+          break
+        case 'SX':
+          addLine(`qc.sx(${q0})`, op.id)
+          break
+        case 'RX':
+          addLine(`qc.rx(${fmt(th)}, ${q0})`, op.id)
+          break
+        case 'RY':
+          addLine(`qc.ry(${fmt(th)}, ${q0})`, op.id)
+          break
+        case 'RZ':
+          addLine(`qc.rz(${fmt(th)}, ${q0})`, op.id)
+          break
+        case 'P':
+          addLine(`qc.p(${fmt(lam)}, ${q0})`, op.id)
+          break
+        case 'CX':
           addLine(`qc.cx(${q0}, ${q1})`, op.id)
           break
         case 'CZ':
@@ -95,6 +120,24 @@ export function generatePythonCode(
           break
         case 'SWAP':
           addLine(`qc.swap(${q0}, ${q1})`, op.id)
+          break
+        case 'RXX':
+          addLine(`qc.rxx(${fmt(th)}, ${q0}, ${q1})`, op.id)
+          break
+        case 'RZZ':
+          addLine(`qc.rzz(${fmt(th)}, ${q0}, ${q1})`, op.id)
+          break
+        case 'CCX':
+          addLine(`qc.ccx(${q0}, ${q1}, ${q2})`, op.id)
+          break
+        case 'CCZ':
+          addLine(`qc.ccz(${q0}, ${q1}, ${q2})`, op.id)
+          break
+        case 'RESET':
+          addLine(`qc.reset(${q0})`, op.id)
+          break
+        case 'BARRIER':
+          addLine(`qc.barrier(${q0})`, op.id)
           break
         case 'M':
           hasExplicitMeasure = true
@@ -118,6 +161,10 @@ export function generatePythonCode(
     for (const op of sortedOps) {
       const q0 = op.targets[0] ?? 0
       const q1 = op.targets[1] ?? (q0 + 1)
+      const q2 = op.targets[2] ?? (q1 + 1)
+      const th = op.params && typeof op.params['theta'] === 'number' ? op.params['theta'] : Math.PI / 2
+      const lam = op.params && typeof op.params['lambda'] === 'number' ? op.params['lambda'] : Math.PI / 2
+      const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(4))
 
       switch (op.gate) {
         case 'I':
@@ -138,10 +185,31 @@ export function generatePythonCode(
         case 'S':
           addLine(`circuit.append(cirq.S(q${q0}))`, op.id)
           break
+        case 'SDG':
+          addLine(`circuit.append(cirq.S(q${q0})**-1)`, op.id)
+          break
         case 'T':
           addLine(`circuit.append(cirq.T(q${q0}))`, op.id)
           break
-        case 'CNOT':
+        case 'TDG':
+          addLine(`circuit.append(cirq.T(q${q0})**-1)`, op.id)
+          break
+        case 'SX':
+          addLine(`circuit.append(cirq.X(q${q0})**0.5)`, op.id)
+          break
+        case 'RX':
+          addLine(`circuit.append(cirq.rx(${fmt(th)})(q${q0}))`, op.id)
+          break
+        case 'RY':
+          addLine(`circuit.append(cirq.ry(${fmt(th)})(q${q0}))`, op.id)
+          break
+        case 'RZ':
+          addLine(`circuit.append(cirq.rz(${fmt(th)})(q${q0}))`, op.id)
+          break
+        case 'P':
+          addLine(`circuit.append(cirq.ZPowGate(exponent=${fmt(lam / Math.PI)})(q${q0}))`, op.id)
+          break
+        case 'CX':
           addLine(`circuit.append(cirq.CNOT(q${q0}, q${q1}))`, op.id)
           break
         case 'CZ':
@@ -149,6 +217,24 @@ export function generatePythonCode(
           break
         case 'SWAP':
           addLine(`circuit.append(cirq.SWAP(q${q0}, q${q1}))`, op.id)
+          break
+        case 'RXX':
+          addLine(`circuit.append(cirq.XXPowGate(exponent=${fmt(th / Math.PI)})(q${q0}, q${q1}))`, op.id)
+          break
+        case 'RZZ':
+          addLine(`circuit.append(cirq.ZZPowGate(exponent=${fmt(th / Math.PI)})(q${q0}, q${q1}))`, op.id)
+          break
+        case 'CCX':
+          addLine(`circuit.append(cirq.CCX(q${q0}, q${q1}, q${q2}))`, op.id)
+          break
+        case 'CCZ':
+          addLine(`circuit.append(cirq.CCZ(q${q0}, q${q1}, q${q2}))`, op.id)
+          break
+        case 'RESET':
+          addLine(`circuit.append(cirq.reset(q${q0}))`, op.id)
+          break
+        case 'BARRIER':
+          addLine(`# Barrier: circuit.append(cirq.Moment())`, op.id)
           break
         case 'M':
           addLine(`circuit.append(cirq.measure(q${q0}, key='m${q0}'))`, op.id)
@@ -169,6 +255,10 @@ export function generatePythonCode(
       for (const op of sortedOps) {
         const q0 = op.targets[0] ?? 0
         const q1 = op.targets[1] ?? (q0 + 1)
+        const q2 = op.targets[2] ?? (q1 + 1)
+        const th = op.params && typeof op.params['theta'] === 'number' ? op.params['theta'] : Math.PI / 2
+        const lam = op.params && typeof op.params['lambda'] === 'number' ? op.params['lambda'] : Math.PI / 2
+        const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(4))
 
         switch (op.gate) {
           case 'I':
@@ -189,10 +279,31 @@ export function generatePythonCode(
           case 'S':
             addLine(`    qml.S(wires=${q0})`, op.id)
             break
+          case 'SDG':
+            addLine(`    qml.S(wires=${q0}).inv()`, op.id)
+            break
           case 'T':
             addLine(`    qml.T(wires=${q0})`, op.id)
             break
-          case 'CNOT':
+          case 'TDG':
+            addLine(`    qml.T(wires=${q0}).inv()`, op.id)
+            break
+          case 'SX':
+            addLine(`    qml.SX(wires=${q0})`, op.id)
+            break
+          case 'RX':
+            addLine(`    qml.RX(${fmt(th)}, wires=${q0})`, op.id)
+            break
+          case 'RY':
+            addLine(`    qml.RY(${fmt(th)}, wires=${q0})`, op.id)
+            break
+          case 'RZ':
+            addLine(`    qml.RZ(${fmt(th)}, wires=${q0})`, op.id)
+            break
+          case 'P':
+            addLine(`    qml.PhaseShift(${fmt(lam)}, wires=${q0})`, op.id)
+            break
+          case 'CX':
             addLine(`    qml.CNOT(wires=[${q0}, ${q1}])`, op.id)
             break
           case 'CZ':
@@ -200,6 +311,24 @@ export function generatePythonCode(
             break
           case 'SWAP':
             addLine(`    qml.SWAP(wires=[${q0}, ${q1}])`, op.id)
+            break
+          case 'RXX':
+            addLine(`    qml.IsingXX(${fmt(th)}, wires=[${q0}, ${q1}])`, op.id)
+            break
+          case 'RZZ':
+            addLine(`    qml.IsingZZ(${fmt(th)}, wires=[${q0}, ${q1}])`, op.id)
+            break
+          case 'CCX':
+            addLine(`    qml.Toffoli(wires=[${q0}, ${q1}, ${q2}])`, op.id)
+            break
+          case 'CCZ':
+            addLine(`    qml.CCZ(wires=[${q0}, ${q1}, ${q2}])`, op.id)
+            break
+          case 'RESET':
+            addLine(`    qml.Reset(wires=${q0})`, op.id)
+            break
+          case 'BARRIER':
+            addLine(`    # Barrier`, op.id)
             break
           case 'M':
             // PennyLane measurement is sampled in return
@@ -274,22 +403,232 @@ export function parsePythonCode(
       }
     }
 
-    // 1. Single Qubit Gates: Qiskit `qc.h(0)`, `qc.x(1)`, etc.
-    const qiskitSingleMatch = trimmed.match(/^qc\.(h|x|y|z|s|t|id|i|measure)\s*\(\s*(\d+)/i)
+    // 1. Single Qubit Gates: Qiskit `qc.h(0)`, `qc.x(1)`, `qc.rx(theta, 0)`, etc.
+    const qiskitSingleMatch = trimmed.match(/^qc\.([a-zA-Z]+)\s*\(([^)]*)\)/i)
     if (qiskitSingleMatch) {
-      const gateName = qiskitSingleMatch[1].toUpperCase()
-      const target = parseInt(qiskitSingleMatch[2], 10)
+      const gateName = qiskitSingleMatch[1].toLowerCase()
+      const args = qiskitSingleMatch[2].split(',').map((a) => a.trim())
+      let target: number
+      let param: number | undefined
+
+      const extraArgGates = ['rx', 'ry', 'rz', 'p']
+      if (extraArgGates.includes(gateName) && args.length >= 2) {
+        const pv = parseFloat(args[0])
+        target = parseInt(args[1], 10)
+        if (!isNaN(pv)) param = pv
+      } else {
+        target = parseInt(args[0], 10)
+      }
+
+      if (!isNaN(target)) {
+        maxReferencedQubit = Math.max(maxReferencedQubit, target)
+
+        let gateType: GateType | null = null
+        let gateParams: { [key: string]: number } | undefined
+        switch (gateName) {
+          case 'id':
+          case 'i':
+            gateType = 'I'
+            break
+          case 'x':
+            gateType = 'X'
+            break
+          case 'y':
+            gateType = 'Y'
+            break
+          case 'z':
+            gateType = 'Z'
+            break
+          case 'h':
+            gateType = 'H'
+            break
+          case 's':
+            gateType = 'S'
+            break
+          case 'sdg':
+            gateType = 'SDG'
+            break
+          case 't':
+            gateType = 'T'
+            break
+          case 'tdg':
+            gateType = 'TDG'
+            break
+          case 'sx':
+            gateType = 'SX'
+            break
+          case 'rx':
+            gateType = 'RX'
+            gateParams = { theta: param ?? Math.PI / 2 }
+            break
+          case 'ry':
+            gateType = 'RY'
+            gateParams = { theta: param ?? Math.PI / 2 }
+            break
+          case 'rz':
+            gateType = 'RZ'
+            gateParams = { theta: param ?? Math.PI / 2 }
+            break
+          case 'p':
+            gateType = 'P'
+            gateParams = { lambda: param ?? Math.PI / 2 }
+            break
+          case 'reset':
+            gateType = 'RESET'
+            break
+          case 'barrier':
+            gateType = 'BARRIER'
+            break
+          case 'measure':
+            gateType = 'M'
+            break
+        }
+
+        if (gateType) {
+          const moment = qubitMoments[target] || 0
+          qubitMoments[target] = moment + 1
+
+          const id = genGateId()
+          const op: GateOperation = { id, gate: gateType, targets: [target], moment }
+          if (gateParams) op.params = gateParams
+          ops.push(op)
+          lineToGateId[lineNum] = id
+          gateIdToLine[id] = lineNum
+          continue
+        }
+      }
+    }
+
+    // 2. Controlled / 2-Qubit + Multi-Qubit Gates: Qiskit `qc.cx(0, 1)`, `qc.rxx(θ, 0, 1)`, `qc.ccx(0,1,2)`
+    const qiskitTwoMatch = trimmed.match(/^qc\.(cx|cnot|cz|swap|rxx|rzz|ccx|ccz)\s*\(([^)]*)\)/i)
+    if (qiskitTwoMatch) {
+      const gateName = qiskitTwoMatch[1].toLowerCase()
+      const args = qiskitTwoMatch[2].split(',').map((a) => a.trim())
+      let targets: number[]
+      let param: number | undefined
+
+      const angleGates = ['rxx', 'rzz']
+      if (angleGates.includes(gateName)) {
+        const pv = parseFloat(args[0])
+        if (!isNaN(pv)) param = pv
+        targets = args.slice(1).map((a) => parseInt(a, 10))
+      } else {
+        targets = args.map((a) => parseInt(a, 10))
+      }
+
+      const valid = targets.every((t) => !isNaN(t))
+      if (valid) {
+        maxReferencedQubit = Math.max(...targets, maxReferencedQubit)
+
+        let gateType: GateType | null = null
+        let gateParams: { [key: string]: number } | undefined
+        switch (gateName) {
+          case 'cx':
+          case 'cnot':
+            gateType = 'CX'
+            break
+          case 'cz':
+            gateType = 'CZ'
+            break
+          case 'swap':
+            gateType = 'SWAP'
+            break
+          case 'rxx':
+            gateType = 'RXX'
+            gateParams = { theta: param ?? Math.PI / 2 }
+            break
+          case 'rzz':
+            gateType = 'RZZ'
+            gateParams = { theta: param ?? Math.PI / 2 }
+            break
+          case 'ccx':
+            gateType = 'CCX'
+            break
+          case 'ccz':
+            gateType = 'CCZ'
+            break
+        }
+
+        if (gateType) {
+          const moment = targets.reduce((acc, t) => Math.max(acc, qubitMoments[t] || 0), 0)
+          for (const t of targets) qubitMoments[t] = moment + 1
+
+          const id = genGateId()
+          const op: GateOperation = { id, gate: gateType, targets, moment }
+          if (gateParams) op.params = gateParams
+          ops.push(op)
+          lineToGateId[lineNum] = id
+          gateIdToLine[id] = lineNum
+          continue
+        }
+      }
+    }
+
+    // 3. Cirq single gates: `circuit.append(cirq.H(q0))`, `cirq.rx(1.57)(q0)`, `cirq.X(q0)**0.5`
+    let cirqSingleMatch = trimmed.match(/circuit\.append\s*\(\s*cirq\.(rx|ry|rz)\(\s*([^\s,)]+)\)\s*\(\s*q?(\d+)/i)
+    if (cirqSingleMatch) {
+      const gateName = cirqSingleMatch[1].toLowerCase()
+      const param = parseFloat(cirqSingleMatch[2])
+      const target = parseInt(cirqSingleMatch[3], 10)
       maxReferencedQubit = Math.max(maxReferencedQubit, target)
 
-      let gateType: GateType = 'H'
-      if (gateName === 'ID' || gateName === 'I') gateType = 'I'
-      else if (gateName === 'X') gateType = 'X'
-      else if (gateName === 'Y') gateType = 'Y'
-      else if (gateName === 'Z') gateType = 'Z'
-      else if (gateName === 'H') gateType = 'H'
-      else if (gateName === 'S') gateType = 'S'
-      else if (gateName === 'T') gateType = 'T'
-      else if (gateName === 'MEASURE') gateType = 'M'
+      let gateType: GateType = 'RX'
+      if (gateName === 'ry') gateType = 'RY'
+      else if (gateName === 'rz') gateType = 'RZ'
+      const gateParams = { theta: isNaN(param) ? Math.PI / 2 : param }
+
+      const moment = qubitMoments[target] || 0
+      qubitMoments[target] = moment + 1
+
+      const id = genGateId()
+      const op: GateOperation = { id, gate: gateType, targets: [target], moment, params: gateParams }
+      ops.push(op)
+      lineToGateId[lineNum] = id
+      gateIdToLine[id] = lineNum
+      continue
+    }
+    // Cirq `circuit.append(cirq.reset(q0))`
+    cirqSingleMatch = trimmed.match(/circuit\.append\s*\(\s*cirq\.(reset)\s*\(\s*q?(\d+)/i)
+    if (cirqSingleMatch) {
+      const target = parseInt(cirqSingleMatch[2], 10)
+      maxReferencedQubit = Math.max(maxReferencedQubit, target)
+      const moment = qubitMoments[target] || 0
+      qubitMoments[target] = moment + 1
+
+      const id = genGateId()
+      ops.push({ id, gate: 'RESET', targets: [target], moment })
+      lineToGateId[lineNum] = id
+      gateIdToLine[id] = lineNum
+      continue
+    }
+    // Cirq measure: `circuit.append(cirq.measure(q0, key='m0'))`
+    cirqSingleMatch = trimmed.match(/circuit\.append\s*\(\s*cirq\.measure\(\s*q?(\d+)/i)
+    if (cirqSingleMatch) {
+      const target = parseInt(cirqSingleMatch[1], 10)
+      maxReferencedQubit = Math.max(maxReferencedQubit, target)
+      const moment = qubitMoments[target] || 0
+      qubitMoments[target] = moment + 1
+
+      const id = genGateId()
+      ops.push({ id, gate: 'M', targets: [target], moment })
+      lineToGateId[lineNum] = id
+      gateIdToLine[id] = lineNum
+      continue
+    }
+    cirqSingleMatch = trimmed.match(/circuit\.append\s*\(\s*cirq\.(H|X|Y|Z|S|T|I)(?!\w)(\(\s*q?(\d+)\))?(\s*\*\*\s*([^\s,)]+))?/i)
+    if (cirqSingleMatch) {
+      const gateName = cirqSingleMatch[1].toUpperCase() as GateType
+      const target = parseInt(cirqSingleMatch[3] ?? '0', 10)
+      const powerStr = cirqSingleMatch[5]
+      maxReferencedQubit = Math.max(maxReferencedQubit, target)
+
+      let gateType: GateType = gateName
+      if (powerStr) {
+        const power = parseFloat(powerStr)
+        if (gateName === 'S' && power === -1) gateType = 'SDG'
+        else if (gateName === 'T' && power === -1) gateType = 'TDG'
+        else if (gateName === 'X' && Math.abs(power - 0.5) < 1e-6) gateType = 'SX'
+      }
 
       const moment = qubitMoments[target] || 0
       qubitMoments[target] = moment + 1
@@ -301,81 +640,155 @@ export function parsePythonCode(
       continue
     }
 
-    // 2. Controlled / 2-Qubit Gates: Qiskit `qc.cx(0, 1)`, `qc.cz(0, 1)`, `qc.swap(0, 1)`
-    const qiskitTwoMatch = trimmed.match(/^qc\.(cx|cnot|cz|swap)\s*\(\s*(\d+)\s*,\s*(\d+)/i)
-    if (qiskitTwoMatch) {
-      const gateName = qiskitTwoMatch[1].toUpperCase()
-      const ctrl = parseInt(qiskitTwoMatch[2], 10)
-      const trgt = parseInt(qiskitTwoMatch[3], 10)
-      maxReferencedQubit = Math.max(maxReferencedQubit, ctrl, trgt)
+    // 4. Cirq 2-qubit gates: `circuit.append(cirq.CNOT(q0, q1))`, `cirq.XXPowGate(exponent=0.5)(q0,q1)`, `cirq.CCX(q0,q1,q2)`
+    let cirqTwoMatch = trimmed.match(/circuit\.append\s*\(\s*cirq\.(CNOT|CX|CZ|SWAP|CCX|CCZ)\s*\(([^)]*)\)/i)
+    if (cirqTwoMatch) {
+      const gateName = cirqTwoMatch[1].toUpperCase()
+      const args = cirqTwoMatch[2].split(',').map((a) => a.trim().replace(/^q/i, ''))
+      const targets = args.map((a) => parseInt(a, 10))
+      const valid = targets.every((t) => !isNaN(t))
 
-      let gateType: GateType = 'CNOT'
-      if (gateName === 'CX' || gateName === 'CNOT') gateType = 'CNOT'
-      else if (gateName === 'CZ') gateType = 'CZ'
-      else if (gateName === 'SWAP') gateType = 'SWAP'
+      if (valid) {
+        maxReferencedQubit = Math.max(...targets, maxReferencedQubit)
 
-      const moment = Math.max(qubitMoments[ctrl] || 0, qubitMoments[trgt] || 0)
-      qubitMoments[ctrl] = moment + 1
-      qubitMoments[trgt] = moment + 1
+        let gateType: GateType
+        switch (gateName) {
+          case 'CCX': gateType = 'CCX'; break
+          case 'CCZ': gateType = 'CCZ'; break
+          case 'CZ': gateType = 'CZ'; break
+          case 'SWAP': gateType = 'SWAP'; break
+          default: gateType = 'CX'
+        }
+
+        const moment = targets.reduce((acc, t) => Math.max(acc, qubitMoments[t] || 0), 0)
+        for (const t of targets) qubitMoments[t] = moment + 1
+
+        const id = genGateId()
+        ops.push({ id, gate: gateType, targets, moment })
+        lineToGateId[lineNum] = id
+        gateIdToLine[id] = lineNum
+        continue
+      }
+    }
+
+    // Cirq XXPowGate / ZZPowGate: `circuit.append(cirq.XXPowGate(exponent=0.5)(q0, q1))`
+    cirqTwoMatch = trimmed.match(/circuit\.append\s*\(\s*cirq\.(XXPowGate|ZZPowGate)\(\s*exponent\s*=\s*([^\s,)]+)\)\s*\(\s*q?(\d+)\s*,\s*q?(\d+)/i)
+    if (cirqTwoMatch) {
+      const gateName = cirqTwoMatch[1]
+      const exponent = parseFloat(cirqTwoMatch[2])
+      const q0 = parseInt(cirqTwoMatch[3], 10)
+      const q1 = parseInt(cirqTwoMatch[4], 10)
+      maxReferencedQubit = Math.max(maxReferencedQubit, q0, q1)
+
+      const gateType: GateType = gateName === 'XXPowGate' ? 'RXX' : 'RZZ'
+      const theta = isNaN(exponent) ? Math.PI / 2 : exponent * Math.PI
+
+      const moment = Math.max(qubitMoments[q0] || 0, qubitMoments[q1] || 0)
+      qubitMoments[q0] = moment + 1
+      qubitMoments[q1] = moment + 1
 
       const id = genGateId()
-      ops.push({ id, gate: gateType, targets: [ctrl, trgt], moment })
+      ops.push({ id, gate: gateType, targets: [q0, q1], moment, params: { theta } })
       lineToGateId[lineNum] = id
       gateIdToLine[id] = lineNum
       continue
     }
 
-    // 3. Cirq single gates: `circuit.append(cirq.H(q0))`
-    const cirqSingleMatch = trimmed.match(/circuit\.append\s*\(\s*cirq\.(H|X|Y|Z|S|T|I)\s*\(\s*q?(\d+)/i)
+    // Cirq ZPowGate (phase P): `circuit.append(cirq.ZPowGate(exponent=0.5)(q0))`
+    cirqSingleMatch = trimmed.match(/circuit\.append\s*\(\s*cirq\.ZPowGate\(\s*exponent\s*=\s*([^\s,)]+)\)\s*\(\s*q?(\d+)/i)
     if (cirqSingleMatch) {
-      const gateName = cirqSingleMatch[1].toUpperCase() as GateType
+      const exponent = parseFloat(cirqSingleMatch[1])
       const target = parseInt(cirqSingleMatch[2], 10)
       maxReferencedQubit = Math.max(maxReferencedQubit, target)
+      const lambda = isNaN(exponent) ? Math.PI / 2 : exponent * Math.PI
 
       const moment = qubitMoments[target] || 0
       qubitMoments[target] = moment + 1
 
       const id = genGateId()
-      ops.push({ id, gate: gateName, targets: [target], moment })
+      ops.push({ id, gate: 'P', targets: [target], moment, params: { lambda } })
       lineToGateId[lineNum] = id
       gateIdToLine[id] = lineNum
       continue
     }
 
-    // 4. Cirq 2-qubit gates: `circuit.append(cirq.CNOT(q0, q1))`
-    const cirqTwoMatch = trimmed.match(/circuit\.append\s*\(\s*cirq\.(CNOT|CX|CZ|SWAP)\s*\(\s*q?(\d+)\s*,\s*q?(\d+)/i)
-    if (cirqTwoMatch) {
-      const gateName = cirqTwoMatch[1].toUpperCase()
-      const ctrl = parseInt(cirqTwoMatch[2], 10)
-      const trgt = parseInt(cirqTwoMatch[3], 10)
-      maxReferencedQubit = Math.max(maxReferencedQubit, ctrl, trgt)
+    // 5. PennyLane single gates: `qml.Hadamard(wires=0)`, `qml.RX(1.57, wires=0)`
+    let pennySingleMatch = trimmed.match(/qml\.(RX|RY|RZ)\(\s*([^\s,]+)\s*,\s*wires\s*=\s*(\d+)/i)
+    if (pennySingleMatch) {
+      const name = pennySingleMatch[1].toUpperCase()
+      const param = parseFloat(pennySingleMatch[2])
+      const target = parseInt(pennySingleMatch[3], 10)
+      maxReferencedQubit = Math.max(maxReferencedQubit, target)
 
-      const gateType: GateType = gateName === 'CZ' ? 'CZ' : gateName === 'SWAP' ? 'SWAP' : 'CNOT'
-      const moment = Math.max(qubitMoments[ctrl] || 0, qubitMoments[trgt] || 0)
-      qubitMoments[ctrl] = moment + 1
-      qubitMoments[trgt] = moment + 1
+      const gateType: GateType = name === 'RY' ? 'RY' : name === 'RZ' ? 'RZ' : 'RX'
+      const gateParams = { theta: isNaN(param) ? Math.PI / 2 : param }
+
+      const moment = qubitMoments[target] || 0
+      qubitMoments[target] = moment + 1
 
       const id = genGateId()
-      ops.push({ id, gate: gateType, targets: [ctrl, trgt], moment })
+      ops.push({ id, gate: gateType, targets: [target], moment, params: gateParams })
       lineToGateId[lineNum] = id
       gateIdToLine[id] = lineNum
       continue
     }
 
-    // 5. PennyLane single gates: `qml.Hadamard(wires=0)`
-    const pennySingleMatch = trimmed.match(/qml\.(Hadamard|PauliX|PauliY|PauliZ|S|T|Identity)\s*\(\s*wires\s*=\s*(\d+)/i)
+    // PennyLane PhaseShift: `qml.PhaseShift(1.57, wires=0)`
+    pennySingleMatch = trimmed.match(/qml\.(PhaseShift)\(\s*([^\s,]+)\s*,\s*wires\s*=\s*(\d+)/i)
     if (pennySingleMatch) {
-      const name = pennySingleMatch[1]
+      const param = parseFloat(pennySingleMatch[2])
+      const target = parseInt(pennySingleMatch[3], 10)
+      maxReferencedQubit = Math.max(maxReferencedQubit, target)
+      const lambda = isNaN(param) ? Math.PI / 2 : param
+
+      const moment = qubitMoments[target] || 0
+      qubitMoments[target] = moment + 1
+
+      const id = genGateId()
+      ops.push({ id, gate: 'P', targets: [target], moment, params: { lambda } })
+      lineToGateId[lineNum] = id
+      gateIdToLine[id] = lineNum
+      continue
+    }
+
+    // PennyLane Reset: `qml.Reset(wires=0)`
+    pennySingleMatch = trimmed.match(/qml\.(Reset)\(\s*wires\s*=\s*(\d+)/i)
+    if (pennySingleMatch) {
       const target = parseInt(pennySingleMatch[2], 10)
       maxReferencedQubit = Math.max(maxReferencedQubit, target)
 
-      let gateType: GateType = 'H'
-      if (name === 'PauliX') gateType = 'X'
-      else if (name === 'PauliY') gateType = 'Y'
-      else if (name === 'PauliZ') gateType = 'Z'
-      else if (name === 'S') gateType = 'S'
-      else if (name === 'T') gateType = 'T'
-      else if (name === 'Identity') gateType = 'I'
+      const moment = qubitMoments[target] || 0
+      qubitMoments[target] = moment + 1
+
+      const id = genGateId()
+      ops.push({ id, gate: 'RESET', targets: [target], moment })
+      lineToGateId[lineNum] = id
+      gateIdToLine[id] = lineNum
+      continue
+    }
+
+    pennySingleMatch = trimmed.match(/qml\.(SX|Hadamard|PauliX|PauliY|PauliZ|S|T|Identity)\s*\(\s*wires\s*=\s*(\d+)/i)
+    if (pennySingleMatch) {
+      const name = pennySingleMatch[1]
+      const invMatch = trimmed.match(/\.inv\s*\(\s*\)/i)
+      const target = parseInt(pennySingleMatch[2], 10)
+      maxReferencedQubit = Math.max(maxReferencedQubit, target)
+
+      let gateType: GateType
+      switch (name) {
+        case 'PauliX': gateType = 'X'; break
+        case 'PauliY': gateType = 'Y'; break
+        case 'PauliZ': gateType = 'Z'; break
+        case 'S':
+          gateType = invMatch ? 'SDG' : 'S'
+          break
+        case 'T':
+          gateType = invMatch ? 'TDG' : 'T'
+          break
+        case 'SX': gateType = 'SX'; break
+        case 'Identity': gateType = 'I'; break
+        default: gateType = 'H'
+      }
 
       const moment = qubitMoments[target] || 0
       qubitMoments[target] = moment + 1
@@ -387,21 +800,50 @@ export function parsePythonCode(
       continue
     }
 
-    // 6. PennyLane controlled gates: `qml.CNOT(wires=[0, 1])`
-    const pennyTwoMatch = trimmed.match(/qml\.(CNOT|CZ|SWAP)\s*\(\s*wires\s*=\s*\[\s*(\d+)\s*,\s*(\d+)\s*\]/i)
+    // 6. PennyLane controlled gates: `qml.CNOT(wires=[0, 1])`, `qml.Toffoli(wires=[0,1,2])`, `qml.IsingXX(1.57, wires=[0,1])`
+    let pennyTwoMatch = trimmed.match(/qml\.(IsingXX|IsingZZ)\(\s*([^\s,]+)\s*,\s*wires\s*=\s*\[\s*(\d+)\s*,\s*(\d+)\s*\]/i)
     if (pennyTwoMatch) {
       const name = pennyTwoMatch[1]
-      const ctrl = parseInt(pennyTwoMatch[2], 10)
-      const trgt = parseInt(pennyTwoMatch[3], 10)
-      maxReferencedQubit = Math.max(maxReferencedQubit, ctrl, trgt)
+      const param = parseFloat(pennyTwoMatch[2])
+      const q0 = parseInt(pennyTwoMatch[3], 10)
+      const q1 = parseInt(pennyTwoMatch[4], 10)
+      maxReferencedQubit = Math.max(maxReferencedQubit, q0, q1)
 
-      const gateType: GateType = name === 'CZ' ? 'CZ' : name === 'SWAP' ? 'SWAP' : 'CNOT'
-      const moment = Math.max(qubitMoments[ctrl] || 0, qubitMoments[trgt] || 0)
-      qubitMoments[ctrl] = moment + 1
-      qubitMoments[trgt] = moment + 1
+      const gateType: GateType = name === 'IsingXX' ? 'RXX' : 'RZZ'
+      const theta = isNaN(param) ? Math.PI / 2 : param
+
+      const moment = Math.max(qubitMoments[q0] || 0, qubitMoments[q1] || 0)
+      qubitMoments[q0] = moment + 1
+      qubitMoments[q1] = moment + 1
 
       const id = genGateId()
-      ops.push({ id, gate: gateType, targets: [ctrl, trgt], moment })
+      ops.push({ id, gate: gateType, targets: [q0, q1], moment, params: { theta } })
+      lineToGateId[lineNum] = id
+      gateIdToLine[id] = lineNum
+      continue
+    }
+
+    pennyTwoMatch = trimmed.match(/qml\.(Toffoli|CCZ|CNOT|CZ|SWAP)\s*\(\s*wires\s*=\s*\[\s*([\d,\s]+)\s*\]/i)
+    if (pennyTwoMatch) {
+      const name = pennyTwoMatch[1]
+      const nums = pennyTwoMatch[2].split(',').map((a) => parseInt(a.trim(), 10))
+      const targets = nums.filter((n) => !isNaN(n))
+      maxReferencedQubit = Math.max(...targets, maxReferencedQubit)
+
+      let gateType: GateType
+      switch (name) {
+        case 'Toffoli': gateType = 'CCX'; break
+        case 'CCZ': gateType = 'CCZ'; break
+        case 'CZ': gateType = 'CZ'; break
+        case 'SWAP': gateType = 'SWAP'; break
+        default: gateType = 'CX'
+      }
+
+      const moment = targets.reduce((acc, t) => Math.max(acc, qubitMoments[t] || 0), 0)
+      for (const t of targets) qubitMoments[t] = moment + 1
+
+      const id = genGateId()
+      ops.push({ id, gate: gateType, targets, moment })
       lineToGateId[lineNum] = id
       gateIdToLine[id] = lineNum
       continue

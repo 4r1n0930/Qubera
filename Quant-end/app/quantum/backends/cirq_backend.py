@@ -1,3 +1,5 @@
+import math
+
 import cirq
 
 from app.quantum.base import QuantumBackend
@@ -10,13 +12,21 @@ GATE_MAP = {
     "Z": cirq.Z,
     "H": cirq.H,
     "S": cirq.S,
+    "Sdg": cirq.S ** -1,
     "T": cirq.T,
+    "Tdg": cirq.T ** -1,
     "CNOT": cirq.CNOT,
+    "CX": cirq.CNOT,
     "CZ": cirq.CZ,
     "SWAP": cirq.SWAP,
+    "CCX": cirq.TOFFOLI,
+    "CCZ": cirq.CCZ,
 }
 
-TWO_QUBIT_GATES = {"CNOT", "CZ", "SWAP"}
+TWO_QUBIT_GATES = {"CNOT", "CX", "CZ", "SWAP"}
+THREE_QUBIT_GATES = {"CCX", "CCZ"}
+PARAMETERIZED_GATES = {"RX", "RY", "RZ", "P", "RXX", "RZZ"}
+OPERATION_GATES = {"measure", "reset", "barrier"}
 
 MEASURE_KEY = "result"
 
@@ -31,12 +41,36 @@ class CirqBackend(QuantumBackend):
 
         operations = []
         for op in circuit.operations:
-            gate = GATE_MAP[op.gate]
+            if op.gate in OPERATION_GATES:
+                if op.gate == "reset":
+                    for t in op.targets:
+                        operations.append(cirq.reset(qubits[t]))
+                continue
+
             targets = [qubits[t] for t in op.targets]
-            if op.gate in TWO_QUBIT_GATES:
-                operations.append(gate(*targets))
+            params = list(getattr(op, "params", []))
+
+            if op.gate in PARAMETERIZED_GATES:
+                if op.gate == "RX":
+                    operations.append(cirq.rx(params[0])(targets[0]))
+                elif op.gate == "RY":
+                    operations.append(cirq.ry(params[0])(targets[0]))
+                elif op.gate == "RZ":
+                    operations.append(cirq.rz(params[0])(targets[0]))
+                elif op.gate == "P":
+                    operations.append((cirq.Z ** (params[0] / math.pi))(targets[0]))
+                elif op.gate == "RXX":
+                    exponent = params[0] / math.pi
+                    operations.append(cirq.XXPowGate(exponent=exponent)(*targets))
+                elif op.gate == "RZZ":
+                    exponent = params[0] / math.pi
+                    operations.append(cirq.ZZPowGate(exponent=exponent)(*targets))
+            elif op.gate in THREE_QUBIT_GATES:
+                operations.append(GATE_MAP[op.gate](*targets))
+            elif op.gate in TWO_QUBIT_GATES:
+                operations.append(GATE_MAP[op.gate](*targets))
             else:
-                operations.append(gate(targets[0]))
+                operations.append(GATE_MAP[op.gate](targets[0]))
 
         operations.append(cirq.measure(*qubits, key=MEASURE_KEY))
 

@@ -1,23 +1,47 @@
 import ast
+import math
 from typing import List, Optional, Set
 
-from app.quantum.circuit_validator import CircuitValidationError, validate_circuit
+from app.quantum.circuit_validator import (
+    CircuitValidationError,
+    validate_circuit,
+    SINGLE_QUBIT_GATES,
+    ROTATION_GATES,
+    TWO_QUBIT_GATES,
+    TWO_QUBIT_ROTATION_GATES,
+    THREE_QUBIT_GATES,
+    OPERATION_GATES,
+)
 
 SUPPORTED_GATES = {
+    "id": "I",
     "i": "I",
     "x": "X",
     "y": "Y",
     "z": "Z",
     "h": "H",
     "s": "S",
+    "sdg": "Sdg",
     "t": "T",
+    "tdg": "Tdg",
+    "rx": "RX",
+    "ry": "RY",
+    "rz": "RZ",
+    "p": "P",
     "cx": "CNOT",
     "cz": "CZ",
     "swap": "SWAP",
+    "rxx": "RXX",
+    "rzz": "RZZ",
+    "ccx": "CCX",
+    "ccz": "CCZ",
 }
 
-SINGLE_QUBIT_GATES_PY = {"i", "x", "y", "z", "h", "s", "t"}
+SINGLE_QUBIT_GATES_PY = {"id", "i", "x", "y", "z", "h", "s", "sdg", "t", "tdg"}
+ROTATION_GATES_PY = {"rx", "ry", "rz", "p"}
 TWO_QUBIT_GATES_PY = {"cx", "cz", "swap"}
+TWO_QUBIT_ROTATION_GATES_PY = {"rxx", "rzz"}
+THREE_QUBIT_GATES_PY = {"ccx", "ccz"}
 
 
 def parse(code: str) -> dict:
@@ -143,6 +167,25 @@ def parse(code: str) -> dict:
         line = node.lineno
         column = node.col_offset
 
+        if method_name == "measure_all":
+            operations.append({"gate": "measure", "targets": []})
+            continue
+
+        if method_name == "measure":
+            continue
+
+        if method_name == "barrier":
+            continue
+
+        if method_name == "reset":
+            args = []
+            for arg in call.args:
+                if isinstance(arg, ast.Constant) and isinstance(arg.value, int):
+                    args.append(arg.value)
+            if args:
+                operations.append({"gate": "reset", "targets": args})
+            continue
+
         if method_name not in SUPPORTED_GATES:
             errors.append(CircuitValidationError(
                 code="INVALID_GATE",
@@ -154,46 +197,144 @@ def parse(code: str) -> dict:
 
         gate_name = SUPPORTED_GATES[method_name]
         args = []
+        params = []
+        valid_args = True
+
         for arg in call.args:
-            if isinstance(arg, ast.Constant) and isinstance(arg.value, int):
-                args.append(arg.value)
+            if isinstance(arg, ast.Constant):
+                if isinstance(arg.value, int):
+                    args.append(arg.value)
+                elif isinstance(arg.value, float):
+                    params.append(arg.value)
+                else:
+                    valid_args = False
+            elif isinstance(arg, ast.UnaryOp) and isinstance(arg.op, ast.USub):
+                operand = arg.operand
+                if isinstance(operand, ast.Constant):
+                    if isinstance(operand.value, (int, float)):
+                        params.append(-operand.value)
+                    else:
+                        valid_args = False
+                else:
+                    valid_args = False
+            elif isinstance(arg, ast.Attribute):
+                if arg.attr == "pi":
+                    params.append(math.pi)
+                else:
+                    valid_args = False
+            elif isinstance(arg, ast.BinOp):
+                val = _eval_numeric_expr(arg)
+                if val is not None:
+                    params.append(val)
+                else:
+                    valid_args = False
+            elif isinstance(arg, ast.Call):
+                if isinstance(arg.func, ast.Attribute) and arg.func.attr == "pi":
+                    params.append(math.pi)
+                else:
+                    valid_args = False
             else:
+                valid_args = False
+
+        if not valid_args:
+            errors.append(CircuitValidationError(
+                code="INVALID_GATE_TARGETS",
+                message=f"Gate {method_name} arguments must be integer qubit indices or numeric parameters",
+                line=line,
+                column=column,
+            ))
+            continue
+
+        if method_name in SINGLE_QUBIT_GATES_PY:
+            if len(args) != 1:
                 errors.append(CircuitValidationError(
                     code="INVALID_GATE_TARGETS",
-                    message=f"Gate {method_name} arguments must be integer qubit indices",
+                    message=f"Gate {method_name} requires exactly 1 target, got {len(args)}",
                     line=line,
                     column=column,
                 ))
-                break
-        else:
-            if method_name in SINGLE_QUBIT_GATES_PY:
-                if len(args) != 1:
-                    errors.append(CircuitValidationError(
-                        code="INVALID_GATE_TARGETS",
-                        message=f"Gate {method_name} requires exactly 1 target, got {len(args)}",
-                        line=line,
-                        column=column,
-                    ))
-                    continue
-            elif method_name in TWO_QUBIT_GATES_PY:
-                if len(args) != 2:
-                    errors.append(CircuitValidationError(
-                        code="INVALID_GATE_TARGETS",
-                        message=f"Gate {method_name} requires exactly 2 targets, got {len(args)}",
-                        line=line,
-                        column=column,
-                    ))
-                    continue
-                if len(set(args)) != 2:
-                    errors.append(CircuitValidationError(
-                        code="INVALID_GATE_TARGETS",
-                        message=f"Gate {method_name} targets must be distinct",
-                        line=line,
-                        column=column,
-                    ))
-                    continue
+                continue
+        elif method_name in ROTATION_GATES_PY:
+            if len(args) != 1:
+                errors.append(CircuitValidationError(
+                    code="INVALID_GATE_TARGETS",
+                    message=f"Gate {method_name} requires exactly 1 target, got {len(args)}",
+                    line=line,
+                    column=column,
+                ))
+                continue
+            if len(params) != 1:
+                errors.append(CircuitValidationError(
+                    code="INVALID_GATE_PARAMS",
+                    message=f"Gate {method_name} requires exactly 1 parameter (angle in radians)",
+                    line=line,
+                    column=column,
+                ))
+                continue
+        elif method_name in TWO_QUBIT_GATES_PY:
+            if len(args) != 2:
+                errors.append(CircuitValidationError(
+                    code="INVALID_GATE_TARGETS",
+                    message=f"Gate {method_name} requires exactly 2 targets, got {len(args)}",
+                    line=line,
+                    column=column,
+                ))
+                continue
+            if len(set(args)) != 2:
+                errors.append(CircuitValidationError(
+                    code="INVALID_GATE_TARGETS",
+                    message=f"Gate {method_name} targets must be distinct",
+                    line=line,
+                    column=column,
+                ))
+                continue
+        elif method_name in TWO_QUBIT_ROTATION_GATES_PY:
+            if len(args) != 2:
+                errors.append(CircuitValidationError(
+                    code="INVALID_GATE_TARGETS",
+                    message=f"Gate {method_name} requires exactly 2 targets, got {len(args)}",
+                    line=line,
+                    column=column,
+                ))
+                continue
+            if len(set(args)) != 2:
+                errors.append(CircuitValidationError(
+                    code="INVALID_GATE_TARGETS",
+                    message=f"Gate {method_name} targets must be distinct",
+                    line=line,
+                    column=column,
+                ))
+                continue
+            if len(params) != 1:
+                errors.append(CircuitValidationError(
+                    code="INVALID_GATE_PARAMS",
+                    message=f"Gate {method_name} requires exactly 1 parameter (angle in radians)",
+                    line=line,
+                    column=column,
+                ))
+                continue
+        elif method_name in THREE_QUBIT_GATES_PY:
+            if len(args) != 3:
+                errors.append(CircuitValidationError(
+                    code="INVALID_GATE_TARGETS",
+                    message=f"Gate {method_name} requires exactly 3 targets, got {len(args)}",
+                    line=line,
+                    column=column,
+                ))
+                continue
+            if len(set(args)) != 3:
+                errors.append(CircuitValidationError(
+                    code="INVALID_GATE_TARGETS",
+                    message=f"Gate {method_name} targets must be distinct",
+                    line=line,
+                    column=column,
+                ))
+                continue
 
-            operations.append({"gate": gate_name, "targets": args})
+        op = {"gate": gate_name, "targets": args}
+        if params:
+            op["params"] = params
+        operations.append(op)
 
     circuit_errors = validate_circuit(num_qubits, operations)
     errors.extend(circuit_errors)
@@ -206,3 +347,29 @@ def parse(code: str) -> dict:
         "circuit": {"num_qubits": num_qubits, "operations": operations},
         "errors": [],
     }
+
+
+def _eval_numeric_expr(node: ast.AST) -> Optional[float]:
+    if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+        return float(node.value)
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+        val = _eval_numeric_expr(node.operand)
+        return -val if val is not None else None
+    if isinstance(node, ast.BinOp):
+        left = _eval_numeric_expr(node.left)
+        right = _eval_numeric_expr(node.right)
+        if left is not None and right is not None:
+            if isinstance(node.op, ast.Add):
+                return left + right
+            elif isinstance(node.op, ast.Sub):
+                return left - right
+            elif isinstance(node.op, ast.Mult):
+                return left * right
+            elif isinstance(node.op, ast.Div):
+                return left / right
+    if isinstance(node, ast.Attribute) and node.attr == "pi":
+        return math.pi
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+        if node.func.attr == "pi":
+            return math.pi
+    return None

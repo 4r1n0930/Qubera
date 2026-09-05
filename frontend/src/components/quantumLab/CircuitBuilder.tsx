@@ -340,14 +340,13 @@ function gateRole(op: GateOperation, qIdx: number): 'box' | 'dot' | 'oplus' | 's
   if (op.gate === 'M') return 'measure'
   if (op.targets.length === 1) return 'box'
   switch (op.gate) {
-    case 'CNOT':
+    case 'CX':
       return qIdx === op.targets[0] ? 'dot' : 'oplus'
     case 'CCX':
       return qIdx === op.targets[0] || qIdx === op.targets[1] ? 'dot' : 'oplus'
     case 'CZ':
     case 'CCZ':
       return 'dot'
-    case 'CSWAP':
     case 'SWAP':
       return 'swap'
     default:
