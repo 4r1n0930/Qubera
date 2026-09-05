@@ -10,6 +10,7 @@ import { CodeEditor } from '../pages/CodeEditor/CodeEditor'
 import { Games } from '../pages/Games/Games'
 import { Challenges } from '../pages/Challenges/Challenges'
 import { Progress } from '../pages/Progress/Progress'
+import { QuantumLabPage } from '../pages/QuantumLab/QuantumLabPage'
 import { Leaderboard } from '../pages/Leaderboard/Leaderboard'
 import { AITutor } from '../pages/AITutor/AITutor'
 import { Resources } from '../pages/Resources/Resources'
@@ -26,6 +27,10 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Home /> },
       { path: 'learn', element: <Learn /> },
+      { path: 'lab', element: <QuantumLabPage /> },
+      { path: 'progress', element: <Progress /> },
+      { path: 'login', element: <LoginPage /> },
+      { path: '*', element: <NotFound /> },
       { path: 'quantum-lab', element: <QuantumLab /> },
       { path: 'code-editor', element: <CodeEditor /> },
       { path: 'contact', element: <Contact /> },
@@ -37,7 +42,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Dashboard /> },
       { path: 'learn', element: <Learn /> },
-      { path: 'quantum-lab', element: <QuantumLab /> },
+      { path: 'quantum-lab', element: <QuantumLabPage /> },
       { path: 'code-editor', element: <CodeEditor /> },
       { path: 'games', element: <Games /> },
       { path: 'challenges', element: <Challenges /> },
