@@ -33,6 +33,24 @@ function genId(): string {
   return `gate_${Date.now()}_${idCounter++}`
 }
 
+/**
+ * Default rotation parameters for parameterized gates.
+ */
+function defaultParams(gate: GateType): { [key: string]: number } | undefined {
+  switch (gate) {
+    case 'RX':
+    case 'RY':
+    case 'RZ':
+    case 'RXX':
+    case 'RZZ':
+      return { theta: Math.PI / 2 }
+    case 'P':
+      return { lambda: Math.PI / 2 }
+    default:
+      return undefined
+  }
+}
+
 function createInitialCircuit(): CircuitState {
   return { num_qubits: 1, operations: [] }
 }
@@ -57,7 +75,8 @@ function placeGate(
   circuit: CircuitState,
   gate: GateType,
   targets: number[],
-  column: number
+  column: number,
+  params?: { [key: string]: number }
 ): CircuitState {
   const overlapsWire = (op: GateOperation) => op.targets.some((t) => targets.includes(t))
   const opAt = (c: number) =>
@@ -66,9 +85,11 @@ function placeGate(
   const gateAtColumn = opAt(column)
   const gateAdjacent = opAt(column + 1)
 
+  const finalParams = params ?? defaultParams(gate)
+
   // Between two adjacent gates → insert and shift everything from that column right.
   if (gateAtColumn && gateAdjacent) {
-    const op: GateOperation = { id: genId(), gate, targets: [...targets], moment: column }
+    const op: GateOperation = { id: genId(), gate, targets: [...targets], moment: column, params: finalParams }
     const shifted = circuit.operations.map((existing) =>
       overlapsWire(existing) && existing.moment >= column
         ? { ...existing, moment: existing.moment + 1 }
@@ -80,7 +101,7 @@ function placeGate(
   // Empty space → place in the first free slot, shifting nothing.
   let moment = column
   while (opAt(moment)) moment += 1
-  const op: GateOperation = { id: genId(), gate, targets: [...targets], moment }
+  const op: GateOperation = { id: genId(), gate, targets: [...targets], moment, params: finalParams }
   return { ...circuit, operations: [...circuit.operations, op] }
 }
 
@@ -101,7 +122,7 @@ function moveGate(
     source.targets.every((t, i) => t === targets[i])
   if (samePosition) return circuit
   const withoutSource = circuit.operations.filter((op) => op.id !== gateId)
-  return placeGate({ ...circuit, operations: withoutSource }, source.gate, targets, column)
+  return placeGate({ ...circuit, operations: withoutSource }, source.gate, targets, column, source.params)
 }
 
 function removeGate(circuit: CircuitState, gateId: string): CircuitState {

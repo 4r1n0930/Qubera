@@ -6,6 +6,7 @@ import { LoginPanel } from "../components/login/LoginPanel";
 import { SecurityFooter } from "../components/login/SecurityFooter";
 import { useAuth } from "../contexts/AuthContext";
 import { authService } from "../services/authService";
+import type { LoginFormValues } from "../components/login/LoginForm";
 
 /**
  * Full-screen login page for QUBERA.
@@ -18,28 +19,51 @@ import { authService } from "../services/authService";
 export function LoginPage() {
   const navigate = useNavigate();
   const { login, loginWithToken, isAuthenticated } = useAuth();
-  const [formError, setFormError] = useState<string | undefined>(undefined)
+  const [formError, setFormError] = useState<string | undefined>(undefined);
 
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
   }
 
-  const handleLogin = async (values: { email: string; password: string }) => {
-    setFormError(undefined)
-    const res = await authService.login(values.email, values.password)
-    if (!res.ok) {
-      if (res.notVerified) {
-        authService.setPendingEmail(values.email)
-        navigate('/verify-email', { replace: true })
-        return
+  const handleLogin = async (values: LoginFormValues) => {
+    try {
+      setFormError(undefined);
+
+      const res = await authService.login(values.email, values.password);
+
+      if (!res.ok) {
+        if (res.notVerified) {
+          authService.setPendingEmail(values.email);
+          navigate("/verify-email", { replace: true });
+          return;
+        }
+        throw new Error(res.message || "Login failed");
       }
-      setFormError(res.message || 'Invalid email or password.')
-      return
+
+      if (res.data?.token) {
+        loginWithToken(res.data.token);
+        try {
+          localStorage.setItem("token", res.data.token);
+        } catch {
+          /* ignore */
+        }
+      } else {
+        login();
+      }
+
+      try {
+        if (res.data?.user) {
+          localStorage.setItem("user", JSON.stringify(res.data.user));
+          localStorage.setItem("qubera_user", JSON.stringify(res.data.user));
+        }
+      } catch {
+        /* ignore */
+      }
+
+      navigate("/dashboard", { replace: true });
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Something went wrong");
     }
-    if (res.data?.token) loginWithToken(res.data.token)
-    else login()
-    try { if (res.data?.user) localStorage.setItem('qubera_user', JSON.stringify(res.data.user)) } catch { /* */ }
-    navigate("/dashboard", { replace: true });
   };
   const handleGoogleLogin = () => {
     login();

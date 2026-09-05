@@ -2,7 +2,7 @@ import { LoginCard } from "./LoginCard";
 import type { LoginFormValues } from "./LoginForm";
 
 interface LoginPanelProps {
-  onLogin: (values: LoginFormValues) => void | Promise<void>;
+  onLogin: (values: LoginFormValues) => Promise<void>;
   onGoogleLogin: () => void;
   onGithubLogin: () => void;
   onForgotPassword: () => void;
