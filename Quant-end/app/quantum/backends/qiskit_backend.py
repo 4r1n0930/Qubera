@@ -11,13 +11,27 @@ GATE_MAP = {
     "Z": "z",
     "H": "h",
     "S": "s",
+    "Sdg": "sdg",
     "T": "t",
+    "Tdg": "tdg",
+    "RX": "rx",
+    "RY": "ry",
+    "RZ": "rz",
+    "P": "p",
     "CNOT": "cx",
+    "CX": "cx",
     "CZ": "cz",
     "SWAP": "swap",
+    "RXX": "rxx",
+    "RZZ": "rzz",
+    "CCX": "ccx",
+    "CCZ": "ccz",
 }
 
-TWO_QUBIT_GATES = {"CNOT", "CZ", "SWAP"}
+TWO_QUBIT_GATES = {"CNOT", "CX", "CZ", "SWAP"}
+THREE_QUBIT_GATES = {"CCX", "CCZ"}
+PARAMETERIZED_GATES = {"RX", "RY", "RZ", "P", "RXX", "RZZ"}
+OPERATION_GATES = {"measure", "reset", "barrier"}
 
 
 class QiskitBackend(QuantumBackend):
@@ -29,9 +43,26 @@ class QiskitBackend(QuantumBackend):
         qc = QuantumCircuit(num_qubits, num_qubits)
 
         for op in circuit.operations:
+            if op.gate in OPERATION_GATES:
+                if op.gate == "reset":
+                    for t in op.targets:
+                        qc.reset(t)
+                elif op.gate == "barrier":
+                    if op.targets:
+                        qc.barrier(*op.targets)
+                    else:
+                        qc.barrier()
+                continue
+
             method = GATE_MAP[op.gate]
             targets = op.targets
-            if op.gate in TWO_QUBIT_GATES:
+            params = list(getattr(op, "params", []))
+
+            if op.gate in PARAMETERIZED_GATES:
+                getattr(qc, method)(*params, *targets)
+            elif op.gate in THREE_QUBIT_GATES:
+                getattr(qc, method)(*targets)
+            elif op.gate in TWO_QUBIT_GATES:
                 getattr(qc, method)(targets[0], targets[1])
             else:
                 getattr(qc, method)(targets[0])

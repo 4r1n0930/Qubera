@@ -1,7 +1,17 @@
 import ast
-from typing import List, Optional, Set
+import math
+from typing import List, Optional, Set, Tuple
 
-from app.quantum.circuit_validator import CircuitValidationError, validate_circuit
+from app.quantum.circuit_validator import (
+    CircuitValidationError,
+    validate_circuit,
+    SINGLE_QUBIT_GATES,
+    ROTATION_GATES,
+    TWO_QUBIT_GATES,
+    TWO_QUBIT_ROTATION_GATES,
+    THREE_QUBIT_GATES,
+    OPERATION_GATES,
+)
 
 GATE_MAP = {
     "I": "I",
@@ -14,10 +24,18 @@ GATE_MAP = {
     "CNOT": "CNOT",
     "CZ": "CZ",
     "SWAP": "SWAP",
+    "rx": "RX",
+    "ry": "RY",
+    "rz": "RZ",
+    "PhaseShift": "P",
+    "XXPowGate": "RXX",
+    "ZZPowGate": "RZZ",
+    "TOFFOLI": "CCX",
+    "CCZ": "CCZ",
+    "reset": "reset",
 }
 
-SINGLE_QUBIT_ATTR = {"I", "X", "Y", "Z", "H", "S", "T"}
-TWO_QUBIT_ATTR = {"CNOT", "CZ", "SWAP"}
+POWER_GATES = {"S", "T"}
 
 
 def _extract_qubit_index(node: ast.AST, qubits_var: str) -> Optional[int]:
@@ -29,6 +47,78 @@ def _extract_qubit_index(node: ast.AST, qubits_var: str) -> Optional[int]:
     if isinstance(node, ast.Name) and node.id in ("q0", "q1", "q2", "q3", "q4", "q5", "q6", "q7"):
         return int(node.id[1:])
     return None
+
+
+def _eval_numeric_expr(node: ast.AST) -> Optional[float]:
+    if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+        return float(node.value)
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+        val = _eval_numeric_expr(node.operand)
+        return -val if val is not None else None
+    if isinstance(node, ast.BinOp):
+        left = _eval_numeric_expr(node.left)
+        right = _eval_numeric_expr(node.right)
+        if left is not None and right is not None:
+            if isinstance(node.op, ast.Add):
+                return left + right
+            elif isinstance(node.op, ast.Sub):
+                return left - right
+            elif isinstance(node.op, ast.Mult):
+                return left * right
+            elif isinstance(node.op, ast.Div):
+                return left / right
+    if isinstance(node, ast.Attribute) and node.attr == "pi":
+        return math.pi
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+        if node.func.attr == "pi":
+            return math.pi
+    return None
+
+
+def _extract_gate_name(inner: ast.Call, cirq_names: Set[str]) -> Tuple[Optional[str], Optional[float]]:
+    """Extract the cirq gate attribute and an optional exponent from a gate
+    construction call like cirq.X, cirq.S**-1, or cirq.rx(theta)."""
+    f = inner.func
+
+    if isinstance(f, ast.Attribute):
+        if isinstance(f.value, ast.Name) and f.value.id in cirq_names:
+            if f.attr in POWER_GATES:
+                return f.attr, None
+            return f.attr, None
+        return None, None
+
+    if isinstance(f, ast.BinOp) and isinstance(f.op, ast.Pow):
+        left = f.left
+        if isinstance(left, ast.Attribute) and isinstance(left.value, ast.Name) and left.value.id in cirq_names:
+            exponent = _eval_numeric_expr(f.right)
+            if exponent is not None:
+                return left.attr, exponent
+        return None, None
+
+    if isinstance(f, ast.Call):
+        cf = f.func
+        if isinstance(cf, ast.Attribute) and isinstance(cf.value, ast.Name) and cf.value.id in cirq_names:
+            return cf.attr, None
+
+    return None, None
+
+
+def _extract_construction_params(inner: ast.Call, cirq_names: Set[str]) -> List[float]:
+    """Extract numeric parameters from a curried gate construction call."""
+    params: List[float] = []
+    f = inner.func
+
+    if isinstance(f, ast.Call):
+        for arg in f.args:
+            val = _eval_numeric_expr(arg)
+            if val is not None:
+                params.append(val)
+        for kw in f.keywords:
+            val = _eval_numeric_expr(kw.value)
+            if val is not None:
+                params.append(val)
+
+    return params
 
 
 def parse(code: str) -> dict:
@@ -130,39 +220,83 @@ def parse(code: str) -> dict:
         if not isinstance(inner, ast.Call):
             continue
 
-        inner_func = inner.func
-        if not (isinstance(inner_func, ast.Attribute) and isinstance(inner_func.value, ast.Name)):
+        gate_attr, exponent = _extract_gate_name(inner, cirq_names)
+
+        if gate_attr is None:
             continue
 
-        if inner_func.value.id not in cirq_names:
-            continue
-
-        gate_attr = inner_func.attr
         line = node.lineno
         column = node.col_offset
 
         if gate_attr == "measure":
             continue
 
-        if gate_attr not in GATE_MAP:
+        if gate_attr == "reset":
+            args = []
+            for arg in inner.args:
+                idx = _extract_qubit_index(arg, qubits_var or "qubits")
+                if idx is not None:
+                    args.append(idx)
+            if args:
+                operations.append({"gate": "reset", "targets": args})
+            continue
+
+        if gate_attr in POWER_GATES or gate_attr == "Z":
+            if gate_attr == "Z" and exponent is not None:
+                gate_name = "P"
+            elif exponent == -1.0 and gate_attr == "S":
+                gate_name = "Sdg"
+            elif exponent == -1.0 and gate_attr == "T":
+                gate_name = "Tdg"
+            elif exponent is None or exponent == 1.0:
+                gate_name = "Z" if gate_attr == "Z" else gate_attr
+            else:
+                errors.append(CircuitValidationError(
+                    code="INVALID_GATE",
+                    message=f"Unsupported gate exponent: cirq.{gate_attr}**{exponent}",
+                    line=line,
+                    column=column,
+                ))
+                continue
+        elif exponent is not None:
             errors.append(CircuitValidationError(
                 code="INVALID_GATE",
-                message=f"Unsupported gate: cirq.{gate_attr}",
+                message=f"Unsupported gate exponent: cirq.{gate_attr}**{exponent}",
                 line=line,
                 column=column,
             ))
             continue
+        else:
+            if gate_attr not in GATE_MAP:
+                errors.append(CircuitValidationError(
+                    code="INVALID_GATE",
+                    message=f"Unsupported gate: cirq.{gate_attr}",
+                    line=line,
+                    column=column,
+                ))
+                continue
+            gate_name = GATE_MAP[gate_attr]
 
-        gate_name = GATE_MAP[gate_attr]
         args = []
+        params = []
         valid_args = True
 
         for arg in inner.args:
             idx = _extract_qubit_index(arg, qubits_var or "qubits")
-            if idx is None:
-                valid_args = False
-            else:
+            if idx is not None:
                 args.append(idx)
+            else:
+                val = _eval_numeric_expr(arg)
+                if val is not None:
+                    params.append(val)
+                else:
+                    valid_args = False
+
+        construction_params = _extract_construction_params(inner, cirq_names)
+        params.extend(construction_params)
+
+        if gate_name == "P" and exponent is not None:
+            params.append(exponent * math.pi)
 
         if not valid_args:
             errors.append(CircuitValidationError(
@@ -173,7 +307,7 @@ def parse(code: str) -> dict:
             ))
             continue
 
-        if gate_attr in SINGLE_QUBIT_ATTR:
+        if gate_name in ROTATION_GATES:
             if len(args) != 1:
                 errors.append(CircuitValidationError(
                     code="INVALID_GATE_TARGETS",
@@ -182,7 +316,15 @@ def parse(code: str) -> dict:
                     column=column,
                 ))
                 continue
-        elif gate_attr in TWO_QUBIT_ATTR:
+            if len(params) != 1:
+                errors.append(CircuitValidationError(
+                    code="INVALID_GATE_PARAMS",
+                    message=f"Gate cirq.{gate_attr} requires exactly 1 parameter (angle in radians)",
+                    line=line,
+                    column=column,
+                ))
+                continue
+        elif gate_name in TWO_QUBIT_ROTATION_GATES:
             if len(args) != 2:
                 errors.append(CircuitValidationError(
                     code="INVALID_GATE_TARGETS",
@@ -199,8 +341,65 @@ def parse(code: str) -> dict:
                     column=column,
                 ))
                 continue
+            if len(params) != 1:
+                errors.append(CircuitValidationError(
+                    code="INVALID_GATE_PARAMS",
+                    message=f"Gate cirq.{gate_attr} requires exactly 1 parameter (angle in radians)",
+                    line=line,
+                    column=column,
+                ))
+                continue
+        elif gate_name in SINGLE_QUBIT_GATES:
+            if len(args) != 1:
+                errors.append(CircuitValidationError(
+                    code="INVALID_GATE_TARGETS",
+                    message=f"Gate cirq.{gate_attr} requires exactly 1 target, got {len(args)}",
+                    line=line,
+                    column=column,
+                ))
+                continue
+        elif gate_name in TWO_QUBIT_GATES:
+            if len(args) != 2:
+                errors.append(CircuitValidationError(
+                    code="INVALID_GATE_TARGETS",
+                    message=f"Gate cirq.{gate_attr} requires exactly 2 targets, got {len(args)}",
+                    line=line,
+                    column=column,
+                ))
+                continue
+            if len(set(args)) != 2:
+                errors.append(CircuitValidationError(
+                    code="INVALID_GATE_TARGETS",
+                    message=f"Gate cirq.{gate_attr} targets must be distinct",
+                    line=line,
+                    column=column,
+                ))
+                continue
+        elif gate_name in THREE_QUBIT_GATES:
+            if len(args) != 3:
+                errors.append(CircuitValidationError(
+                    code="INVALID_GATE_TARGETS",
+                    message=f"Gate cirq.{gate_attr} requires exactly 3 targets, got {len(args)}",
+                    line=line,
+                    column=column,
+                ))
+                continue
+            if len(set(args)) != 3:
+                errors.append(CircuitValidationError(
+                    code="INVALID_GATE_TARGETS",
+                    message=f"Gate cirq.{gate_attr} targets must be distinct",
+                    line=line,
+                    column=column,
+                ))
+                continue
 
-        operations.append({"gate": gate_name, "targets": args})
+        if gate_name in TWO_QUBIT_ROTATION_GATES and params:
+            params[0] = params[0] * math.pi
+
+        op = {"gate": gate_name, "targets": args}
+        if params:
+            op["params"] = params
+        operations.append(op)
 
     circuit_errors = validate_circuit(num_qubits, operations)
     errors.extend(circuit_errors)

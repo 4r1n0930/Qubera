@@ -8,8 +8,19 @@ from app.exception import APIError
 MAX_SHOTS = 100000
 MIN_SHOTS = 1
 
-SINGLE_QUBIT_GATES = {"I", "X", "Y", "Z", "H", "S", "T"}
-TWO_QUBIT_GATES = {"CNOT", "CZ", "SWAP"}
+SINGLE_QUBIT_GATES = {"I", "X", "Y", "Z", "H", "S", "Sdg", "T", "Tdg"}
+ROTATION_GATES = {"RX", "RY", "RZ", "P"}
+TWO_QUBIT_GATES = {"CNOT", "CX", "CZ", "SWAP"}
+TWO_QUBIT_ROTATION_GATES = {"RXX", "RZZ"}
+THREE_QUBIT_GATES = {"CCX", "CCZ"}
+OPERATION_GATES = {"measure", "reset", "barrier"}
+
+ALL_GATES = (
+    SINGLE_QUBIT_GATES | ROTATION_GATES | TWO_QUBIT_GATES |
+    TWO_QUBIT_ROTATION_GATES | THREE_QUBIT_GATES | OPERATION_GATES
+)
+
+PARAMETERIZED_GATES = ROTATION_GATES | TWO_QUBIT_ROTATION_GATES
 
 
 class BackendName(str, Enum):
@@ -20,7 +31,8 @@ class BackendName(str, Enum):
 
 class GateOperation(BaseModel):
     gate: str
-    targets: List[int] = Field(min_length=1)
+    targets: List[int] = Field(default_factory=list)
+    params: List[float] = Field(default_factory=list)
 
 
 class Circuit(BaseModel):
@@ -67,15 +79,29 @@ class ExecuteRequest(BaseModel):
                 message="num_qubits must be a positive integer",
             )
         for op in circuit.operations:
-            if op.gate not in SINGLE_QUBIT_GATES and op.gate not in TWO_QUBIT_GATES:
+            if op.gate not in ALL_GATES:
                 raise APIError(
                     code="INVALID_GATE",
                     message=f"Unsupported gate: {op.gate}",
                 )
+
+            if op.gate in OPERATION_GATES:
+                continue
+
             if op.gate in SINGLE_QUBIT_GATES and len(op.targets) != 1:
                 raise APIError(
                     code="INVALID_GATE_TARGETS",
                     message=f"Gate {op.gate} requires exactly 1 target",
+                )
+            if op.gate in ROTATION_GATES and len(op.targets) != 1:
+                raise APIError(
+                    code="INVALID_GATE_TARGETS",
+                    message=f"Gate {op.gate} requires exactly 1 target",
+                )
+            if op.gate in ROTATION_GATES and len(op.params) != 1:
+                raise APIError(
+                    code="INVALID_GATE_PARAMS",
+                    message=f"Gate {op.gate} requires exactly 1 parameter (angle in radians)",
                 )
             if op.gate in TWO_QUBIT_GATES and len(op.targets) != 2:
                 raise APIError(
@@ -83,6 +109,31 @@ class ExecuteRequest(BaseModel):
                     message=f"Gate {op.gate} requires exactly 2 targets",
                 )
             if op.gate in TWO_QUBIT_GATES and len(set(op.targets)) != 2:
+                raise APIError(
+                    code="INVALID_GATE_TARGETS",
+                    message=f"Gate {op.gate} targets must be distinct",
+                )
+            if op.gate in TWO_QUBIT_ROTATION_GATES and len(op.targets) != 2:
+                raise APIError(
+                    code="INVALID_GATE_TARGETS",
+                    message=f"Gate {op.gate} requires exactly 2 targets",
+                )
+            if op.gate in TWO_QUBIT_ROTATION_GATES and len(set(op.targets)) != 2:
+                raise APIError(
+                    code="INVALID_GATE_TARGETS",
+                    message=f"Gate {op.gate} targets must be distinct",
+                )
+            if op.gate in TWO_QUBIT_ROTATION_GATES and len(op.params) != 1:
+                raise APIError(
+                    code="INVALID_GATE_PARAMS",
+                    message=f"Gate {op.gate} requires exactly 1 parameter (angle in radians)",
+                )
+            if op.gate in THREE_QUBIT_GATES and len(op.targets) != 3:
+                raise APIError(
+                    code="INVALID_GATE_TARGETS",
+                    message=f"Gate {op.gate} requires exactly 3 targets",
+                )
+            if op.gate in THREE_QUBIT_GATES and len(set(op.targets)) != 3:
                 raise APIError(
                     code="INVALID_GATE_TARGETS",
                     message=f"Gate {op.gate} targets must be distinct",
@@ -171,15 +222,29 @@ class GenerateRequest(BaseModel):
                 message="num_qubits must be a positive integer",
             )
         for op in circuit.operations:
-            if op.gate not in SINGLE_QUBIT_GATES and op.gate not in TWO_QUBIT_GATES:
+            if op.gate not in ALL_GATES:
                 raise APIError(
                     code="INVALID_GATE",
                     message=f"Unsupported gate: {op.gate}",
                 )
+
+            if op.gate in OPERATION_GATES:
+                continue
+
             if op.gate in SINGLE_QUBIT_GATES and len(op.targets) != 1:
                 raise APIError(
                     code="INVALID_GATE_TARGETS",
                     message=f"Gate {op.gate} requires exactly 1 target",
+                )
+            if op.gate in ROTATION_GATES and len(op.targets) != 1:
+                raise APIError(
+                    code="INVALID_GATE_TARGETS",
+                    message=f"Gate {op.gate} requires exactly 1 target",
+                )
+            if op.gate in ROTATION_GATES and len(op.params) != 1:
+                raise APIError(
+                    code="INVALID_GATE_PARAMS",
+                    message=f"Gate {op.gate} requires exactly 1 parameter (angle in radians)",
                 )
             if op.gate in TWO_QUBIT_GATES and len(op.targets) != 2:
                 raise APIError(
@@ -187,6 +252,31 @@ class GenerateRequest(BaseModel):
                     message=f"Gate {op.gate} requires exactly 2 targets",
                 )
             if op.gate in TWO_QUBIT_GATES and len(set(op.targets)) != 2:
+                raise APIError(
+                    code="INVALID_GATE_TARGETS",
+                    message=f"Gate {op.gate} targets must be distinct",
+                )
+            if op.gate in TWO_QUBIT_ROTATION_GATES and len(op.targets) != 2:
+                raise APIError(
+                    code="INVALID_GATE_TARGETS",
+                    message=f"Gate {op.gate} requires exactly 2 targets",
+                )
+            if op.gate in TWO_QUBIT_ROTATION_GATES and len(set(op.targets)) != 2:
+                raise APIError(
+                    code="INVALID_GATE_TARGETS",
+                    message=f"Gate {op.gate} targets must be distinct",
+                )
+            if op.gate in TWO_QUBIT_ROTATION_GATES and len(op.params) != 1:
+                raise APIError(
+                    code="INVALID_GATE_PARAMS",
+                    message=f"Gate {op.gate} requires exactly 1 parameter (angle in radians)",
+                )
+            if op.gate in THREE_QUBIT_GATES and len(op.targets) != 3:
+                raise APIError(
+                    code="INVALID_GATE_TARGETS",
+                    message=f"Gate {op.gate} requires exactly 3 targets",
+                )
+            if op.gate in THREE_QUBIT_GATES and len(set(op.targets)) != 3:
                 raise APIError(
                     code="INVALID_GATE_TARGETS",
                     message=f"Gate {op.gate} targets must be distinct",

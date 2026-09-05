@@ -7,9 +7,9 @@ export function GatePalette() {
   const [open, setOpen] = useState<Record<GateCategory, boolean>>({
     GENERAL: true,
     ROTATION: false,
-    CONTROLLED: false,
+    TWO_QUBIT: false,
     MULTI_QUBIT: false,
-    MEASURE: false,
+    OPERATIONS: false,
   })
 
   const toggle = (cat: GateCategory) => setOpen((prev) => ({ ...prev, [cat]: !prev[cat] }))
