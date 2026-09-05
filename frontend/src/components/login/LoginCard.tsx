@@ -7,7 +7,7 @@ import { SignupPrompt } from "./SignupPrompt";
 
 interface LoginCardProps {
   /** Submit handler for the login form. */
-  onLogin: (values: LoginFormValues) => void;
+  onLogin: (values: LoginFormValues) => void | Promise<void>;
   /** Placeholder for Google social login. */
   onGoogleLogin: () => void;
   /** Placeholder for GitHub social login. */
@@ -16,6 +16,7 @@ interface LoginCardProps {
   onForgotPassword: () => void;
   /** Placeholder for create-account navigation. */
   onCreateAccount: () => void;
+  formError?: string;
 }
 
 /**
@@ -28,13 +29,14 @@ export function LoginCard({
   onGithubLogin,
   onForgotPassword,
   onCreateAccount,
+  formError,
 }: LoginCardProps) {
   return (
     <div className="flex w-full max-w-[620px] flex-col rounded-[30px] border border-cardborder bg-card p-10 shadow-[0_24px_60px_-30px_rgba(11,61,50,0.18)] sm:w-[580px] sm:p-[60px]">
       <LoginHeader />
 
       <div className="mt-10">
-        <LoginForm onSubmit={onLogin} onForgotPassword={onForgotPassword} />
+        <LoginForm onSubmit={onLogin} onForgotPassword={onForgotPassword} formError={formError} />
       </div>
 
       <div className="mt-9">

@@ -1,7 +1,11 @@
+import { useState } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
 import { QuantumBrandPanel } from "../components/quantum/QuantumBrandPanel";
 import { QuberaLogo } from "../components/quantum/QuberaLogo";
 import { LoginPanel } from "../components/login/LoginPanel";
 import { SecurityFooter } from "../components/login/SecurityFooter";
+import { useAuth } from "../contexts/AuthContext";
+import { authService } from "../services/authService";
 
 /**
  * Full-screen login page for QUBERA.
@@ -12,20 +16,44 @@ import { SecurityFooter } from "../components/login/SecurityFooter";
  * the heavy atom illustration.
  */
 export function LoginPage() {
-  const handleLogin = () => {
-    // Placeholder: real authentication is not wired to a backend yet.
+  const navigate = useNavigate();
+  const { login, loginWithToken, isAuthenticated } = useAuth();
+  const [formError, setFormError] = useState<string | undefined>(undefined)
+
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  const handleLogin = async (values: { email: string; password: string }) => {
+    setFormError(undefined)
+    const res = await authService.login(values.email, values.password)
+    if (!res.ok) {
+      if (res.notVerified) {
+        authService.setPendingEmail(values.email)
+        navigate('/verify-email', { replace: true })
+        return
+      }
+      setFormError(res.message || 'Invalid email or password.')
+      return
+    }
+    if (res.data?.token) loginWithToken(res.data.token)
+    else login()
+    try { if (res.data?.user) localStorage.setItem('qubera_user', JSON.stringify(res.data.user)) } catch { /* */ }
+    navigate("/dashboard", { replace: true });
   };
   const handleGoogleLogin = () => {
-    // Placeholder for Google OAuth flow.
+    login();
+    navigate("/dashboard", { replace: true });
   };
   const handleGithubLogin = () => {
-    // Placeholder for GitHub OAuth flow.
+    login();
+    navigate("/dashboard", { replace: true });
   };
   const handleForgotPassword = () => {
-    // Placeholder: navigate to the password-recovery route.
+    navigate("/forgot-password");
   };
   const handleCreateAccount = () => {
-    // Placeholder: navigate to the signup route.
+    navigate("/signup");
   };
 
   return (
@@ -47,6 +75,7 @@ export function LoginPage() {
           onGithubLogin={handleGithubLogin}
           onForgotPassword={handleForgotPassword}
           onCreateAccount={handleCreateAccount}
+          formError={formError}
         />
       </div>
 

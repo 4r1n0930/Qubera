@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../../contexts/AuthContext'
 import {
   Search,
   Flame,
@@ -19,6 +20,7 @@ interface TopBarProps {
 
 export function TopBar({ onOpenSidebar }: TopBarProps) {
   const navigate = useNavigate()
+  const { logout } = useAuth()
   const [notifOpen, setNotifOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -165,6 +167,7 @@ export function TopBar({ onOpenSidebar }: TopBarProps) {
                 className="dash-dropdown-item"
                 onClick={() => {
                   setProfileOpen(false)
+                  logout()
                   navigate('/login')
                 }}
               >
