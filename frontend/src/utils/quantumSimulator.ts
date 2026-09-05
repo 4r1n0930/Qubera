@@ -4,7 +4,12 @@
  * Calculates exact unitary evolution, basis state probabilities, and shot sampling.
  */
 
-import type { CircuitState, ExecutionResult, BackendType } from '../types/quantumLab'
+import type {
+  CircuitState,
+  ExecutionResult,
+  BackendType,
+  QubitState,
+} from '../types/quantumLab'
 
 export interface ComplexNumber {
   re: number
@@ -188,6 +193,62 @@ function applySWAP(
 }
 
 /**
+ * Clamps a coordinate to the closed interval [-1, 1] to absorb tiny
+ * floating-point overshoot in partial-trace calculations.
+ */
+function clampUnit(v: number): number {
+  return Math.min(1, Math.max(-1, v))
+}
+
+/**
+ * Computes a single qubit's reduced density matrix via partial trace of the
+ * full statevector and returns its Bloch vector together with the marginal
+ * probabilities. This handles entangled multi-qubit states correctly.
+ *
+ *   x = Tr(ρX) =  2·Re(ρ01)
+ *   y = Tr(ρY) = −2·Im(ρ01)
+ *   z = Tr(ρZ) = ρ00 − ρ11 = P(0) − P(1)
+ *
+ * Qubit index 0 is the top wire (most significant bit).
+ */
+function computeQubitState(
+  state: ComplexNumber[],
+  numQubits: number,
+  qubitIndex: number
+): Omit<QubitState, 'qubitIndex'> {
+  const bit = numQubits - 1 - qubitIndex
+  const mask = 1 << bit
+
+  let rho00 = 0
+  let rho11 = 0
+  let rho01Re = 0
+  let rho01Im = 0
+
+  for (let i = 0; i < state.length; i++) {
+    const amp = state[i]
+    if ((i & mask) === 0) {
+      const flip = i | mask
+      const flipAmp = state[flip]
+      rho00 += cAbs2(amp)
+      rho01Re += amp.re * flipAmp.re + amp.im * flipAmp.im
+      rho01Im += amp.im * flipAmp.re - amp.re * flipAmp.im
+    } else {
+      rho11 += cAbs2(amp)
+    }
+  }
+
+  return {
+    blochVector: {
+      x: clampUnit(2 * rho01Re),
+      y: clampUnit(-2 * rho01Im),
+      z: clampUnit(rho00 - rho11),
+    },
+    probability0: Math.round(rho00 * 1e6) / 1e6,
+    probability1: Math.round(rho11 * 1e6) / 1e6,
+  }
+}
+
+/**
  * Simulates a quantum circuit state and returns exact probabilities and shot samples.
  */
 export function simulateCircuit(
@@ -323,6 +384,18 @@ export function simulateCircuit(
   const endTime = performance.now()
   const simulatedBackendDelay = 12.0 + Math.random() * 8.0 // realistic 12-20ms backend response time
 
+  // Shared per-qubit state: reduced density matrix → Bloch vector + marginals.
+  const qubitStates: QubitState[] = Array.from({ length: numQubits }, (_, q) => ({
+    qubitIndex: q,
+    ...computeQubitState(state, numQubits, q),
+  }))
+
+  const first = qubitStates[0].blochVector
+  const blochAngles = {
+    theta: Math.acos(clampUnit(first.z)),
+    phi: Math.atan2(first.y, first.x),
+  }
+
   return {
     backend,
     shots,
@@ -331,6 +404,9 @@ export function simulateCircuit(
     probabilities,
     counts,
     statevector_summary: formatStatevector(state, numQubits),
+    statevector: state,
+    qubitStates,
+    blochAngles,
   }
 }
 

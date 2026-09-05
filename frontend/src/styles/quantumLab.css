@@ -186,7 +186,7 @@
 .qlab-workspace-split {
   display: flex;
   gap: var(--space-5);
-  width: 100%;
+  width: 90%;
   position: relative;
   align-items: stretch;
   transition: all var(--transition-slow);
@@ -339,6 +339,7 @@
 .qlab-circuit-canvas {
   min-width: 540px;
   position: relative;
+  
   display: flex;
   flex-direction: column;
 }
@@ -1321,5 +1322,970 @@
   .qlab-container {
     height: auto;
     min-height: 0;
+  }
+}
+
+/* ==========================================================================
+   QUBERA Quantum Lab — Rebuilt (Circuit + Measurements)
+   ========================================================================== */
+
+/* Container: full available height, capped width, centered */
+.qlab-container-new {
+  height: calc(100vh - var(--header-height) - 64px);
+  min-height: 640px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin-inline: auto;
+}
+
+/* Top row: circuit builder sits side-by-side with the code drawer so both
+   share identical height. The 10px gap appears only when the drawer is open. */
+.qlab-main-row {
+  display: flex;
+  align-items: stretch;
+  flex: 1.4 1 0;
+  min-height: 360px;
+  gap: 10px;
+}
+
+/* Section A — Circuit builder (fills the row, shares width 50/50 in split) */
+.qlab-new-circuit-section {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Section B — Measurements / results (~42% of the workspace height) */
+.qlab-new-results-section {
+  width: 92%;
+  max-width: var(--content-wide);
+  margin-inline: auto;
+  flex: 1 1 0;
+  min-height: 260px;
+}
+
+/* ---------------- Layout wrapper (palette + builder as one panel) ---------------- */
+.qlab-new-layout {
+  display: flex;
+  gap: 0;
+  height: 100%;
+  width: 100%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+/* ---------------- Builder canvas wrapper ---------------- */
+.qlab-new-builder {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+/* Pannable viewport (fills builder minus add-bar) */
+.qlab-new-viewport {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  background:
+    radial-gradient(circle, rgba(47, 107, 87, 0.08) 1px, transparent 1px);
+  background-size: 22px 22px;
+  cursor: grab;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.qlab-new-viewport:active { cursor: grabbing; }
+
+.qlab-new-canvas {
+  position: relative;
+  will-change: transform;
+  transform-origin: 0 0;
+  padding-bottom: var(--space-6);
+}
+
+/* Column labels row */
+.qlab-new-rows {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding-bottom: 2px;
+}
+.qlab-new-col-label {
+  width: 68px;
+  flex-shrink: 0;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-label);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+}
+
+/* ---------------- Qubit wires (vertically stacked, centered) ---------------- */
+.qlab-new-wire {
+  display: flex;
+  align-items: center;
+  height: 66px;
+  position: relative;
+}
+
+.qlab-new-wire-label {
+  width: 96px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-left: var(--space-2);
+  z-index: 3;
+  background: var(--color-surface);
+  height: 100%;
+  cursor: grab;
+}
+.qlab-new-wire-label:active { cursor: grabbing; }
+.qlab-new-qubit-name {
+  font-family: var(--font-mono);
+  font-weight: var(--font-weight-bold);
+  font-size: 0.95rem;
+  color: var(--color-text-primary);
+}
+.qlab-new-qubit-state {
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+}
+
+.qlab-new-wire-track {
+  position: absolute;
+  left: 96px;
+  right: 0;
+  top: 50%;
+  height: 1.5px;
+  background: var(--color-border-strong);
+  z-index: 1;
+}
+
+.qlab-new-wire-cells {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  margin-left: 0;
+  z-index: 2;
+}
+
+.qlab-new-cell {
+  width: 68px;
+  height: 100%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: background-color var(--transition-fast);
+}
+.qlab-new-cell:hover { background: rgba(47, 107, 87, 0.05); }
+
+/* ---------------- Gate nodes ---------------- */
+.qlab-node {
+  position: relative;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  cursor: pointer;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast),
+    filter var(--transition-fast);
+}
+.qlab-node-box {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-primary);
+  font-family: var(--font-mono);
+  font-weight: var(--font-weight-bold);
+  font-size: 1rem;
+  color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+}
+.qlab-node-box:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  background: var(--color-primary-soft);
+}
+.qlab-node-measure {
+  color: var(--color-secondary);
+}
+.qlab-node.is-selected {
+  border-radius: var(--radius-md);
+  box-shadow: 0 0 0 3px rgba(154, 123, 63, 0.35);
+  transform: scale(1.08);
+}
+.qlab-node.is-selected.qlab-node-box {
+  border-color: var(--color-secondary);
+  background: var(--color-secondary-soft);
+  color: var(--color-secondary-hover);
+}
+.qlab-node.is-highlighted.qlab-node-box {
+  border-color: var(--color-secondary);
+  background: var(--color-secondary-soft);
+}
+.qlab-node-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-primary);
+}
+.qlab-node.is-selected .qlab-node-dot { background: var(--color-secondary); }
+.qlab-node-plus {
+  font-family: var(--font-mono);
+  font-weight: var(--font-weight-bold);
+  font-size: 1.3rem;
+  color: var(--color-primary);
+}
+.qlab-node.is-selected .qlab-node-plus { color: var(--color-secondary); }
+.qlab-node-swap {
+  font-family: var(--font-mono);
+  font-weight: var(--font-weight-bold);
+  font-size: 1.4rem;
+  color: var(--color-primary);
+}
+.qlab-node.is-selected .qlab-node-swap { color: var(--color-secondary); }
+.qlab-node-delete-btn {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-error);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Multi-qubit connection line */
+.qlab-connector {
+  position: absolute;
+  width: 2px;
+  background: var(--color-primary);
+  z-index: 2;
+  pointer-events: none;
+}
+.qlab-connector.is-selected { background: var(--color-secondary); }
+
+/* ---------------- Fixed bottom bar ---------------- */
+.qlab-new-addbar {
+  flex-shrink: 0;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+}
+.qlab-new-addbar-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.qlab-new-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: var(--text-body-sm);
+  font-weight: var(--font-weight-medium);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+.qlab-new-btn:hover:not(:disabled) {
+  border-color: var(--color-primary-soft-border);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+.qlab-new-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.qlab-new-btn-sm {
+  padding: 3px 10px;
+  font-size: var(--text-caption);
+}
+.qlab-new-btn-danger:hover:not(:disabled) {
+  border-color: var(--color-error);
+  background: var(--color-error-soft);
+  color: var(--color-error);
+}
+.qlab-new-addbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.qlab-new-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-caption);
+  color: var(--color-text-muted);
+}
+.qlab-new-qubits-count {
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+}
+
+/* ---------------- Gate palette (sidebar within the unified panel) ---------------- */
+.qlab-new-palette {
+  width: 24%;
+  min-width: 168px;
+  max-width: 260px;
+  height: 100%;
+  flex-shrink: 0;
+  background: var(--color-surface-muted);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.qlab-palette {
+  display: flex;
+  
+  flex-direction: column;
+  height: 100%;
+}
+.qlab-palette-head {
+  padding: var(--space-3) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.qlab-palette-title {
+  font-size: var(--text-label);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+.qlab-palette-sub {
+  font-size: var(--text-caption);
+  color: var(--color-text-muted);
+}
+.qlab-palette-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.qlab-palette-group {
+  display: flex;
+  flex-direction: column;
+}
+.qlab-palette-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--space-2) var(--space-2);
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--color-border);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  text-align: left;
+}
+.qlab-palette-group-head:hover { background: var(--color-surface-muted); }
+.qlab-palette-group-label {
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.qlab-palette-chev {
+  transition: transform var(--transition-fast);
+}
+.qlab-palette-chev.is-open { transform: rotate(180deg); }
+.qlab-palette-gates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: var(--space-1) var(--space-2) var(--space-2);
+}
+.qlab-palette-gate {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-background);
+  font-family: var(--font-mono);
+  font-weight: var(--font-weight-bold);
+  font-size: 0.85rem;
+  color: var(--color-text-primary);
+  cursor: grab;
+  user-select: none;
+  position: relative;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast),
+    color var(--transition-fast), transform var(--transition-fast);
+}
+.qlab-palette-gate:hover {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  transform: translateY(-1px);
+}
+.qlab-palette-gate:active { cursor: grabbing; }
+.qlab-palette-gate-grip {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  color: var(--color-text-muted);
+  opacity: 0.6;
+}
+.qlab-palette-gate-symbol { font-size: 0.9rem; }
+.qlab-palette-gate-measure { color: var(--color-secondary); border-color: var(--color-secondary-soft); }
+
+/* ---------------- Measurements / Results ---------------- */
+.qlab-results {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-5);
+  box-shadow: var(--shadow-sm);
+  min-height: 0;
+}
+.qlab-results-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+.qlab-results-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.qlab-results-label {
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-label);
+}
+.qlab-stepper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+.qlab-stepper-btn {
+  width: 30px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface-muted);
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+.qlab-stepper-btn:hover:not(:disabled) {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+.qlab-stepper-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.qlab-stepper-input {
+  width: 110px;
+  height: 34px;
+  border: none;
+  border-left: 1px solid var(--color-border);
+  border-right: 1px solid var(--color-border);
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-body-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  outline: none;
+}
+
+.qlab-results-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: var(--space-4);
+  overflow: hidden;
+}
+
+.qlab-results-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  overflow-y: auto;
+  padding-right: var(--space-1);
+}
+
+.qlab-results-bloch {
+  flex: 0 0 280px;
+  min-width: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-left: 1px solid var(--color-border);
+  padding-left: var(--space-4);
+}
+
+.qlab-results-chart {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Bloch sphere */
+.qlab-bloch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+.qlab-bloch-label {
+  flex-shrink: 0;
+  font-size: var(--text-label);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+  color: var(--color-text-primary);
+}
+.qlab-bloch-sub {
+  flex-shrink: 0;
+  font-size: var(--text-caption);
+  color: var(--color-text-muted);
+}
+.qlab-bloch-svg {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  max-width: 260px;
+  max-height: 260px;
+  aspect-ratio: 1 / 1;
+  cursor: grab;
+  user-select: none;
+}
+.qlab-bloch-svg:active { cursor: grabbing; }
+.qlab-bloch-axis {
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  fill: var(--color-text-muted);
+}
+
+/* Qubit selector above the Bloch sphere for multi-qubit circuits */
+.qlab-bloch-qubit-select {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-bottom: var(--space-1);
+}
+.qlab-bloch-qubit-btn {
+  min-width: 34px;
+  height: 28px;
+  padding: 0 var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-semibold);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+.qlab-bloch-qubit-btn:hover {
+  border-color: var(--color-primary-soft-border);
+  color: var(--color-primary);
+}
+.qlab-bloch-qubit-btn.is-active {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* Coordinates summary line */
+.qlab-bloch-coords {
+  font-family: var(--font-mono);
+  text-align: center;
+}
+
+/* Debug / state-details toggle */
+.qlab-bloch-info-toggle {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  padding: 2px 6px;
+  font-size: var(--text-caption);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.qlab-bloch-info-toggle:hover {
+  background: var(--color-surface-muted);
+  color: var(--color-primary);
+}
+.qlab-bloch-info {
+  width: 100%;
+  max-width: 230px;
+  max-height: 45%;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-caption);
+  font-family: var(--font-mono);
+  color: var(--color-text-secondary);
+}
+.qlab-bloch-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 1px 0;
+}
+.qlab-bloch-info-row code {
+  color: var(--color-text-primary);
+}
+.qlab-bloch-info-divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: var(--space-1) 0;
+}
+
+.qlab-results-chart-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.qlab-results-chart-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-label);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+  color: var(--color-text-primary);
+  flex-shrink: 0;
+}
+.qlab-results-chart-meta {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-regular);
+  color: var(--color-text-muted);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.qlab-results-empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  text-align: center;
+  color: var(--color-text-secondary);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  padding: var(--space-6);
+  min-height: 180px;
+}
+.qlab-results-empty-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--color-surface-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary);
+  margin-bottom: var(--space-2);
+}
+.qlab-results-empty-title {
+  font-size: var(--text-h3);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+.qlab-results-empty-desc {
+  font-size: var(--text-body-sm);
+  color: var(--color-text-muted);
+  max-width: 28rem;
+}
+
+@media (max-width: 820px) {
+  .qlab-new-layout {
+    flex-direction: column;
+  }
+  .qlab-new-palette {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    height: 200px;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .qlab-results-main {
+    flex-direction: column;
+  }
+  .qlab-results-bloch {
+    flex: none;
+    border-left: none;
+    border-top: 1px solid var(--color-border);
+    padding-left: 0;
+    padding-top: var(--space-3);
+  }
+  .qlab-results-controls {
+    gap: var(--space-3);
+  }
+}
+
+/* ==========================================================================
+   QUBERA Quantum Lab — Code Editor Drawer (sliding gate view)
+   ========================================================================== */
+
+.qlab-stage {
+  position: relative;
+  overflow: hidden;
+  padding-right: 0;
+}
+
+/* Circuit mode: drawer hidden, so no gap between circuit and anything. */
+.qlab-stage[data-lab-mode='circuit'] .qlab-main-row {
+  gap: 0;
+}
+
+/* Split mode: circuit and code drawer split the row 50/50 with 10px gap. */
+.qlab-stage[data-lab-mode='split'] .qlab-main-row {
+  gap: 10px;
+}
+
+/* Code mode: the code editor fills the top row (circuit hidden) and the
+   results section stays visible below it. */
+.qlab-stage[data-lab-mode='code'] .qlab-main-row {
+  gap: 0;
+}
+.qlab-stage[data-lab-mode='code'] .qlab-new-circuit-section {
+  flex: 0 0 0;
+  transform: translateX(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ---- Toggle button (top right) ---- */
+.qlab-stage-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 20;
+}
+
+.qlab-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.qlab-toggle-btn:hover {
+  border-color: var(--color-primary-soft-border);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+/* ---- Code drawer (in-flow inside the main row, same height as circuit) ---- */
+.qlab-code-drawer {
+  flex: 0 0 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  transform: translateX(100%);
+  will-change: transform, flex-basis, width;
+  transition:
+    transform 360ms cubic-bezier(0.16, 1, 0.3, 1),
+    flex-basis 360ms cubic-bezier(0.16, 1, 0.3, 1),
+    width 360ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.qlab-code-drawer[data-mode='split'] {
+  flex: 1 1 0;
+  width: auto;
+  transform: translateX(0);
+}
+
+.qlab-code-drawer[data-mode='code'] {
+  flex: 1 1 100%;
+  width: 100%;
+  transform: translateX(0);
+}
+
+.qlab-code-drawer .qlab-code-panel {
+  width: 100%;
+  max-width: none;
+  flex: none;
+  height: 100%;
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+  border-right: none;
+  box-shadow: -12px 0 32px rgba(31, 33, 29, 0.14);
+  animation: none;
+}
+
+.qlab-code-drawer[data-mode='code'] .qlab-code-panel {
+  border-radius: 0;
+  border-left: none;
+}
+
+.qlab-code-drawer .qlab-monaco-wrapper {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Reserve top-right space above the code header for the toggle button */
+.qlab-code-drawer .qlab-code-header {
+  padding-right: 24px;
+}
+
+/* ---- Code panel extras ---- */
+.qlab-code-run {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: var(--text-body-sm);
+  font-weight: var(--font-weight-semibold);
+  border-radius: var(--radius-md);
+  border: none;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.qlab-code-run:hover {
+  background: var(--color-primary-hover);
+}
+
+.qlab-code-run.is-queued {
+  background: var(--color-secondary);
+  cursor: default;
+}
+
+.qlab-code-loading {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-caption);
+}
+
+.qlab-code-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  font-size: var(--text-caption);
+  color: var(--color-text-muted);
+}
+
+.qlab-code-status {
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+}
+
+.qlab-code-filename {
+  font-family: var(--font-mono);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qlab-stage,
+  .qlab-code-drawer {
+    transition: none !important;
   }
 }

@@ -42,7 +42,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Dashboard /> },
       { path: 'learn', element: <Learn /> },
-      { path: 'quantum-lab', element: <QuantumLab /> },
+      { path: 'quantum-lab', element: <QuantumLabPage /> },
       { path: 'code-editor', element: <CodeEditor /> },
       { path: 'games', element: <Games /> },
       { path: 'challenges', element: <Challenges /> },
