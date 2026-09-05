@@ -2,11 +2,12 @@ import { LoginCard } from "./LoginCard";
 import type { LoginFormValues } from "./LoginForm";
 
 interface LoginPanelProps {
-  onLogin: (values: LoginFormValues) => void;
+  onLogin: (values: LoginFormValues) => Promise<void>;
   onGoogleLogin: () => void;
   onGithubLogin: () => void;
   onForgotPassword: () => void;
   onCreateAccount: () => void;
+  formError?: string;
 }
 
 /**
@@ -19,6 +20,7 @@ export function LoginPanel({
   onGithubLogin,
   onForgotPassword,
   onCreateAccount,
+  formError,
 }: LoginPanelProps) {
   return (
     <section
@@ -31,6 +33,7 @@ export function LoginPanel({
         onGithubLogin={onGithubLogin}
         onForgotPassword={onForgotPassword}
         onCreateAccount={onCreateAccount}
+        formError={formError}
       />
     </section>
   );

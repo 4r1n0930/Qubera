@@ -7,23 +7,27 @@ import { SignupPrompt } from "./SignupPrompt";
 
 interface LoginCardProps {
   /** Submit handler for the login form. */
-  onLogin: (values: LoginFormValues) => void;
+  onLogin: (values: LoginFormValues) => Promise<void>;
+
+  /** Backend/API error shown below the login form. */
+  formError?: string;
+
   /** Placeholder for Google social login. */
   onGoogleLogin: () => void;
+
   /** Placeholder for GitHub social login. */
   onGithubLogin: () => void;
+
   /** Placeholder for forgot-password navigation. */
   onForgotPassword: () => void;
+
   /** Placeholder for create-account navigation. */
   onCreateAccount: () => void;
 }
 
-/**
- * White login card: holds the heading, form, social login and signup prompt
- * with generous internal padding and a soft, understated shadow.
- */
 export function LoginCard({
   onLogin,
+  formError,
   onGoogleLogin,
   onGithubLogin,
   onForgotPassword,
@@ -34,7 +38,11 @@ export function LoginCard({
       <LoginHeader />
 
       <div className="mt-10">
-        <LoginForm onSubmit={onLogin} onForgotPassword={onForgotPassword} />
+        <LoginForm
+          onSubmit={onLogin}
+          formError={formError}
+          onForgotPassword={onForgotPassword}
+        />
       </div>
 
       <div className="mt-9">

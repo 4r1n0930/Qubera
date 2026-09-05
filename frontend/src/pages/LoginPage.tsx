@@ -2,7 +2,9 @@ import { QuantumBrandPanel } from "../components/quantum/QuantumBrandPanel";
 import { QuberaLogo } from "../components/quantum/QuberaLogo";
 import { LoginPanel } from "../components/login/LoginPanel";
 import { SecurityFooter } from "../components/login/SecurityFooter";
-
+import type { LoginFormValues } from "../components/login/LoginForm";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 /**
  * Full-screen login page for QUBERA.
  *
@@ -12,8 +14,40 @@ import { SecurityFooter } from "../components/login/SecurityFooter";
  * the heavy atom illustration.
  */
 export function LoginPage() {
-  const handleLogin = () => {
-    // Placeholder: real authentication is not wired to a backend yet.
+  const [loginError, setLoginError] = useState("");
+  const navigate = useNavigate();
+  const handleLogin = async (values: LoginFormValues) => {
+    try {
+      setLoginError("");
+
+      const response = await fetch("http://localhost:5000/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: values.email,
+          password: values.password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Login failed");
+      }
+
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+
+      navigate("/dashboard");
+
+
+    } catch (error) {
+      setLoginError(
+        error instanceof Error ? error.message : "Something went wrong"
+      );
+    }
   };
   const handleGoogleLogin = () => {
     // Placeholder for Google OAuth flow.
@@ -47,6 +81,7 @@ export function LoginPage() {
           onGithubLogin={handleGithubLogin}
           onForgotPassword={handleForgotPassword}
           onCreateAccount={handleCreateAccount}
+          formError={loginError}
         />
       </div>
 

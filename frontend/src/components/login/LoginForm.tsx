@@ -12,7 +12,7 @@ export interface LoginFormValues {
 
 interface LoginFormProps {
   /** Called when the form passes validation and is submitted. */
-  onSubmit: (values: LoginFormValues) => void;
+  onSubmit: (values: LoginFormValues) => Promise<void>;
   /** Placeholder shown below the form (e.g. validation summary). */
   formError?: string;
   /** Handler for the forgot-password link. */
@@ -48,8 +48,9 @@ export function LoginForm({ onSubmit, formError, onForgotPassword }: LoginFormPr
   const [loading, setLoading] = useState(false);
   const emailRef = useRef<HTMLInputElement>(null);
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
     const nextErrors = validate({ email, password });
     setErrors(nextErrors);
 
@@ -61,11 +62,15 @@ export function LoginForm({ onSubmit, formError, onForgotPassword }: LoginFormPr
     }
 
     setLoading(true);
-    // Frontend-only: defer actual auth to a placeholder that the parent handles.
-    window.setTimeout(() => {
+
+    try {
+      await onSubmit({
+        email: email.trim(),
+        password,
+      });
+    } finally {
       setLoading(false);
-      onSubmit({ email: email.trim(), password });
-    }, 900);
+    }
   };
 
   return (
