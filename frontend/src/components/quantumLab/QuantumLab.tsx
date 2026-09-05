@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
 import { CircuitBoard, Code2, SplitSquareHorizontal } from 'lucide-react'
 import type {
@@ -7,11 +7,17 @@ import type {
   GateType,
   BackendType,
   ExecutionState,
+  Framework,
+  UpdateSource,
+  CodeError,
 } from '../../types/quantumLab'
 import { CircuitBuilder } from './CircuitBuilder'
 import { ResultsPanel } from './ResultsPanel'
 import { CodePanel } from './CodePanel'
 import { simulateCircuit } from '../../utils/quantumSimulator'
+import { generateCircuitCode } from '../../utils/codeSync'
+import { codeToIrApi, ConversionError } from '../../services/conversionApi'
+import { useDebouncedCallback } from '../../utils/debounce'
 import '../../styles/quantumLab.css'
 
 type LabMode = 'circuit' | 'split' | 'code'
@@ -26,6 +32,9 @@ const MODE_META: Record<
   split: { icon: SplitSquareHorizontal, label: 'Split' },
   code: { icon: Code2, label: 'Code' },
 }
+
+/** Debounce window for code → IR parsing (300 ms). */
+const CODE_EDIT_DEBOUNCE_MS = 300
 
 let idCounter = 1
 
@@ -146,6 +155,36 @@ export function QuantumLab() {
   const [isRunning, setIsRunning] = useState(false)
   const runVersion = useRef(0)
 
+  // ---------------- Code ↔ circuit synchronization ----------------
+  const [framework, setFramework] = useState<Framework>('qiskit')
+  // Latest-value ref (synced in an effect) so the stable `runCodeParse`
+  // callback reads the current framework at call time, never a stale closure.
+  const frameworkRef = useRef<Framework>(framework)
+  useEffect(() => {
+    frameworkRef.current = framework
+  }, [framework])
+  const [code, setCode] = useState<string>(
+    () => generateCircuitCode({ num_qubits: 1, operations: [] }, 'qiskit').code
+  )
+  const [codeStatus, setCodeStatus] = useState<'synced' | 'parsing' | 'error'>('synced')
+  const [codeError, setCodeError] = useState<CodeError | null>(null)
+
+  /**
+   * Conversion-loop prevention state:
+   *  - `circuitSourceRef` records whether the current circuit originated from
+   *    the builder ('circuit'), from parsed code ('code'), or was mirrorred
+   *    programmatically ('system').
+   *  - `programmaticCodeRef` stores the exact text we last wrote into the
+   *    editor, so the Monaco onChange echo of our own write is ignored and
+   *    never fed back into the debounced parse.
+   */
+  const circuitSourceRef = useRef<UpdateSource>('circuit')
+  const programmaticCodeRef = useRef<string>('')
+
+  // Debounced parse state: abort in-flight requests and ignore stale results.
+  const parseControllerRef = useRef<AbortController | null>(null)
+  const parseVersionRef = useRef(0)
+
   const numQubits = circuit.num_qubits
   const width = circuitWidth(circuit)
   const ToggleIcon = MODE_META[mode].icon
@@ -163,8 +202,109 @@ export function QuantumLab() {
     ? { status: 'error', error: runError }
     : { status: 'success', result: sharedResult }
 
+  /**
+   * circuit → code (local, synchronous). Runs whenever the circuit or target
+   * framework changes, UNLESS the circuit was just produced by code parsing —
+   * that would echo the code back into the editor and restart the loop.
+   */
+  useEffect(() => {
+    if (circuitSourceRef.current === 'code') return
+    const generated = generateCircuitCode(circuit, framework)
+    if (generated.code === programmaticCodeRef.current) return
+    programmaticCodeRef.current = generated.code
+    setCode(generated.code)
+    setCodeStatus('synced')
+    setCodeError(null)
+  }, [circuit, framework])
+
+  // Cancel anything in flight when the lab unmounts.
+  useEffect(() => {
+    return () => {
+      parseControllerRef.current?.abort()
+    }
+  }, [])
+
+  /**
+   * code → circuit (debounced, backend). Applies the parsed IR only when the
+   * response is the latest issued request (stale responses are dropped).
+   * On failure the circuit is left untouched and the structured error is shown.
+   */
+  const runCodeParse = useCallback(
+    async (sourceCode: string) => {
+      parseControllerRef.current?.abort()
+      const controller = new AbortController()
+      parseControllerRef.current = controller
+      const requestId = ++parseVersionRef.current
+
+      setCodeStatus('parsing')
+      setCodeError(null)
+
+      try {
+        const result = await codeToIrApi({
+          code: sourceCode,
+          framework: frameworkRef.current,
+          signal: controller.signal,
+          lastValidCircuit: circuitRef.current,
+        })
+        if (requestId !== parseVersionRef.current) return
+        if (controller.signal.aborted) return
+
+        circuitSourceRef.current = 'code'
+        latestCircuit(result.circuit)
+        setCodeStatus('synced')
+        setCodeError(null)
+      } catch (err) {
+        if (requestId !== parseVersionRef.current) return
+        if (controller.signal.aborted || (err as Error)?.name === 'AbortError') return
+
+        if (err instanceof ConversionError) {
+          setCodeError({ type: err.type, message: err.message, line: err.line, column: err.column })
+        } else {
+          setCodeError({ type: 'parse_error', message: (err as Error)?.message ?? 'Failed to parse code.' })
+        }
+        setCodeStatus('error')
+      } finally {
+        if (parseControllerRef.current === controller) parseControllerRef.current = null
+      }
+    },
+    [latestCircuit]
+  )
+
+  const scheduleCodeParse = useDebouncedCallback(runCodeParse, CODE_EDIT_DEBOUNCE_MS)
+
+  /**
+   * Editor onChange. Ignores the programmatic echo of our own generated code
+   * (loop prevention); otherwise the 300ms-debounced code → IR parse starts.
+   */
+  const handleCodeChange = useCallback(
+    (nextCode: string) => {
+      if (nextCode === programmaticCodeRef.current) {
+        programmaticCodeRef.current = ''
+        return
+      }
+      scheduleCodeParse(nextCode)
+    },
+    [scheduleCodeParse]
+  )
+
+  const handleFrameworkChange = useCallback(
+    (nextFramework: Framework) => {
+      scheduleCodeParse.cancel()
+      parseControllerRef.current?.abort()
+      // Forcing the source to 'circuit' makes the editor regenerate from the
+      // IR in the newly selected dialect on the next effect pass.
+      circuitSourceRef.current = 'circuit'
+      frameworkRef.current = nextFramework
+      setFramework(nextFramework)
+      setCodeError(null)
+    },
+    [scheduleCodeParse]
+  )
+
+  // ---------------- Circuit builder handlers ----------------
   const handleAddGate = useCallback(
     (gate: GateType, targets: number[], column: number) => {
+      circuitSourceRef.current = 'circuit'
       latestCircuit(placeGate(circuitRef.current, gate, targets, column))
       setSelectedGateId(null)
     },
@@ -173,6 +313,7 @@ export function QuantumLab() {
 
   const handleMoveGate = useCallback(
     (gateId: string, targets: number[], column: number) => {
+      circuitSourceRef.current = 'circuit'
       latestCircuit(moveGate(circuitRef.current, gateId, targets, column))
       setSelectedGateId(null)
     },
@@ -181,6 +322,7 @@ export function QuantumLab() {
 
   const handleRemoveGate = useCallback(
     (gateId: string) => {
+      circuitSourceRef.current = 'circuit'
       latestCircuit(removeGate(circuitRef.current, gateId))
       if (selectedGateId === gateId) setSelectedGateId(null)
     },
@@ -189,6 +331,7 @@ export function QuantumLab() {
 
   const handleAddQubit = useCallback(() => {
     if (circuitRef.current.num_qubits >= 8) return
+    circuitSourceRef.current = 'circuit'
     latestCircuit({ ...circuitRef.current, num_qubits: circuitRef.current.num_qubits + 1 })
   }, [latestCircuit])
 
@@ -196,6 +339,7 @@ export function QuantumLab() {
     if (circuitRef.current.num_qubits <= 1) return
     const last = circuitRef.current.num_qubits - 1
     const filtered = circuitRef.current.operations.filter((op) => !op.targets.includes(last))
+    circuitSourceRef.current = 'circuit'
     latestCircuit({ num_qubits: last, operations: filtered })
   }, [latestCircuit])
 
@@ -216,12 +360,14 @@ export function QuantumLab() {
         ...op,
         targets: op.targets.map((t) => remap[t] ?? t),
       }))
+      circuitSourceRef.current = 'circuit'
       latestCircuit({ ...circuitRef.current, operations })
     },
     [latestCircuit]
   )
 
   const handleClear = useCallback(() => {
+    circuitSourceRef.current = 'circuit'
     latestCircuit({ ...circuitRef.current, operations: [] })
     setRunError(null)
     setSelectedGateId(null)
@@ -290,7 +436,14 @@ export function QuantumLab() {
         </section>
 
         <aside className="qlab-code-drawer" data-mode={mode} aria-label="Code editor">
-          <CodePanel />
+          <CodePanel
+            code={code}
+            framework={framework}
+            status={codeStatus}
+            error={codeError}
+            onCodeChange={handleCodeChange}
+            onFrameworkChange={handleFrameworkChange}
+          />
         </aside>
       </div>
 
