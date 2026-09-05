@@ -18,9 +18,18 @@ import { Profile } from '../pages/Profile/Profile'
 import { SettingsPage } from '../pages/Settings/SettingsPage'
 import { Contact } from '../pages/Contact/Contact'
 import { NotFound } from '../pages/NotFound/NotFound'
+import { ForgotPassword } from '../pages/ForgotPassword/ForgotPassword'
+import { Signup } from '../pages/Signup/Signup'
+import { VerifyEmail } from '../pages/VerifyEmail/VerifyEmail'
+import { ResetPassword } from '../pages/ResetPassword/ResetPassword'
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
+  { path: '/forgot-password', element: <ForgotPassword /> },
+  { path: '/signup', element: <Signup /> },
+  { path: '/verify-email', element: <VerifyEmail /> },
+  { path: '/reset-password', element: <ResetPassword /> },
+  { path: '/reset-password/:token', element: <ResetPassword /> },
   {
     path: '/',
     element: <PublicLayout />,
@@ -30,6 +39,11 @@ export const router = createBrowserRouter([
       { path: 'lab', element: <QuantumLabPage /> },
       { path: 'progress', element: <Progress /> },
       { path: 'login', element: <LoginPage /> },
+      { path: 'forgot-password', element: <ForgotPassword /> },
+      { path: 'signup', element: <Signup /> },
+      { path: 'verify-email', element: <VerifyEmail /> },
+      { path: 'reset-password', element: <ResetPassword /> },
+      { path: 'reset-password/:token', element: <ResetPassword /> },
       { path: '*', element: <NotFound /> },
       { path: 'quantum-lab', element: <QuantumLab /> },
       { path: 'code-editor', element: <CodeEditor /> },

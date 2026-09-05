@@ -1,10 +1,13 @@
+import { useState } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
 import { QuantumBrandPanel } from "../components/quantum/QuantumBrandPanel";
 import { QuberaLogo } from "../components/quantum/QuberaLogo";
 import { LoginPanel } from "../components/login/LoginPanel";
 import { SecurityFooter } from "../components/login/SecurityFooter";
+import { useAuth } from "../contexts/AuthContext";
+import { authService } from "../services/authService";
 import type { LoginFormValues } from "../components/login/LoginForm";
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+
 /**
  * Full-screen login page for QUBERA.
  *
@@ -14,52 +17,67 @@ import { useNavigate } from "react-router-dom";
  * the heavy atom illustration.
  */
 export function LoginPage() {
-  const [loginError, setLoginError] = useState("");
   const navigate = useNavigate();
+  const { login, loginWithToken, isAuthenticated } = useAuth();
+  const [formError, setFormError] = useState<string | undefined>(undefined);
+
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   const handleLogin = async (values: LoginFormValues) => {
     try {
-      setLoginError("");
+      setFormError(undefined);
 
-      const response = await fetch("http://localhost:5000/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: values.email,
-          password: values.password,
-        }),
-      });
+      const res = await authService.login(values.email, values.password);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Login failed");
+      if (!res.ok) {
+        if (res.notVerified) {
+          authService.setPendingEmail(values.email);
+          navigate("/verify-email", { replace: true });
+          return;
+        }
+        throw new Error(res.message || "Login failed");
       }
 
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      if (res.data?.token) {
+        loginWithToken(res.data.token);
+        try {
+          localStorage.setItem("token", res.data.token);
+        } catch {
+          /* ignore */
+        }
+      } else {
+        login();
+      }
 
-      navigate("/dashboard");
+      try {
+        if (res.data?.user) {
+          localStorage.setItem("user", JSON.stringify(res.data.user));
+          localStorage.setItem("qubera_user", JSON.stringify(res.data.user));
+        }
+      } catch {
+        /* ignore */
+      }
 
-
+      navigate("/dashboard", { replace: true });
     } catch (error) {
-      setLoginError(
-        error instanceof Error ? error.message : "Something went wrong"
-      );
+      setFormError(error instanceof Error ? error.message : "Something went wrong");
     }
   };
   const handleGoogleLogin = () => {
-    // Placeholder for Google OAuth flow.
+    login();
+    navigate("/dashboard", { replace: true });
   };
   const handleGithubLogin = () => {
-    // Placeholder for GitHub OAuth flow.
+    login();
+    navigate("/dashboard", { replace: true });
   };
   const handleForgotPassword = () => {
-    // Placeholder: navigate to the password-recovery route.
+    navigate("/forgot-password");
   };
   const handleCreateAccount = () => {
-    // Placeholder: navigate to the signup route.
+    navigate("/signup");
   };
 
   return (
@@ -81,7 +99,7 @@ export function LoginPage() {
           onGithubLogin={handleGithubLogin}
           onForgotPassword={handleForgotPassword}
           onCreateAccount={handleCreateAccount}
-          formError={loginError}
+          formError={formError}
         />
       </div>
 
