@@ -6,6 +6,23 @@
 
 export type BackendType = 'qiskit' | 'cirq' | 'pennylane' | 'openqasm'
 
+/**
+ * Code-authoring frameworks supported by the conversion service.
+ * `openqasm2` and `openqasm3` are the OpenQASM 2.0 and 3.0 dialects
+ * (distinct from the `openqasm` execution backend alias).
+ */
+export type Framework = 'qiskit' | 'pennylane' | 'cirq' | 'openqasm2' | 'openqasm3'
+
+export const FRAMEWORKS: Framework[] = ['qiskit', 'pennylane', 'cirq', 'openqasm2', 'openqasm3']
+
+export const FRAMEWORK_LABELS: Record<Framework, string> = {
+  qiskit: 'Qiskit',
+  pennylane: 'PennyLane',
+  cirq: 'Cirq',
+  openqasm2: 'OpenQASM 2.0',
+  openqasm3: 'OpenQASM 3.0',
+}
+
 export type GateCategory =
   | 'GENERAL'
   | 'ROTATION'
@@ -63,7 +80,27 @@ export interface CircuitState {
   operations: GateOperation[]
 }
 
-export type UpdateSource = 'visual' | 'system'
+/**
+ * Where the last circuit edit originated:
+ *  - `circuit`: the visual builder changed the circuit → code is regenerated locally.
+ *  - `code`: the code editor changed the circuit (debounced backend parse) → do not echo code back.
+ *  - `system`: a programmatic/silent write (e.g. generated code mirrored into the editor).
+ */
+export type UpdateSource = 'circuit' | 'code' | 'system'
+
+/** Alias: the flat JSON representation of a circuit shared across panels. */
+export type CircuitIR = CircuitState
+
+/**
+ * Structured conversion/validation error matching the backend error contract
+ * `{ success: false, error: { type, message, line, column } }`.
+ */
+export interface CodeError {
+  type: string
+  message: string
+  line?: number
+  column?: number
+}
 
 export type Operation = GateOperation
 

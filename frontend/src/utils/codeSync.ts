@@ -1,11 +1,24 @@
 /**
  * Quantum Code Synchronization Engine
- * Generates idiomatic Python code (Qiskit, Cirq, PennyLane) from visual circuit state
- * and parses Python code back into the normalized circuit state.
+ * Generates idiomatic code (Qiskit, Cirq, PennyLane, OpenQASM 2.0/3.0) from the
+ * visual circuit IR, and parses Python code back into the normalized circuit IR.
  * Maintains bidirectional line-to-gate highlighting mapping.
+ *
+ * Architecture: IR → code generation runs locally in the browser for a
+ * zero-latency editing loop. Code → IR semantic parsing is delegated to the
+ * Node.js conversion service (/api/conversion/*) via a debounced request;
+ * `parsePythonCode` remains as a resilient offline fallback.
  */
 
-import type { CircuitState, GateOperation, BackendType, GateType } from '../types/quantumLab'
+import type {
+  CircuitState,
+  GateOperation,
+  BackendType,
+  GateType,
+  Framework,
+  CircuitIR,
+} from '../types/quantumLab'
+import { generateOpenQasm2, generateOpenQasm3 } from './openQasm'
 
 export interface CodeGenResult {
   code: string
@@ -348,6 +361,29 @@ export function generatePythonCode(
 }
 
 /**
+ * Generates code for the given framework from the circuit IR.
+ * Reuses `generatePythonCode` for the Python frameworks and dispatches to the
+ * local OpenQASM 2.0/3.0 generators otherwise. This is the single entry point
+ * used for the interactive editing loop (never round-tripped through the API).
+ */
+export function generateCircuitCode(
+  circuit: CircuitIR,
+  framework: Framework,
+  shots = 1000
+): CodeGenResult {
+  switch (framework) {
+    case 'qiskit':
+    case 'cirq':
+    case 'pennylane':
+      return generatePythonCode(circuit, framework, shots)
+    case 'openqasm2':
+      return generateOpenQasm2(circuit)
+    case 'openqasm3':
+      return generateOpenQasm3(circuit)
+  }
+}
+
+/**
  * Parses Python code into normalized CircuitState.
  * Supports Qiskit, Cirq, and PennyLane constructs.
  */
@@ -401,6 +437,21 @@ export function parsePythonCode(
       if (!isNaN(q) && q >= 1 && q <= 6) {
         detectedQubits = q
       }
+    }
+
+    // Qiskit measure_all(): measure every declared qubit, then probe next parse input
+    const measureAllMatch = trimmed.match(/^qc\.measure_all\s*\(\s*\)/i)
+    if (measureAllMatch) {
+      const baseMoment = Math.max(0, ...qubitMoments)
+      for (let q = 0; q < detectedQubits; q++) {
+        const id = genGateId()
+        ops.push({ id, gate: 'M', targets: [q], moment: baseMoment })
+        lineToGateId[lineNum] = id
+        gateIdToLine[id] = lineNum
+        qubitMoments[q] = baseMoment + 1
+        maxReferencedQubit = Math.max(maxReferencedQubit, q)
+      }
+      continue
     }
 
     // 1. Single Qubit Gates: Qiskit `qc.h(0)`, `qc.x(1)`, `qc.rx(theta, 0)`, etc.
