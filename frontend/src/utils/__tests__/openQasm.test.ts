@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import type { CircuitIR } from '../../types/quantumLab'
+import type { CircuitState } from '../../types/quantumLab'
 import { generateOpenQasm2, generateOpenQasm3 } from '../openQasm'
 
-const CIRCUIT: CircuitIR = {
+const CIRCUIT: CircuitState = {
   num_qubits: 3,
   operations: [
     { id: 'a', gate: 'H', targets: [0], moment: 0 },

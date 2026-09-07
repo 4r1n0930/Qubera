@@ -6,7 +6,7 @@
  * `gate` definitions so the output stays valid in any OQ2 consumer.
  */
 
-import type { CircuitIR, CircuitState, GateOperation } from '../types/quantumLab'
+import type { CircuitState, GateOperation } from '../types/quantumLab'
 
 export interface OpenQasmGenResult {
   code: string
@@ -31,7 +31,7 @@ function paramValue(
   return op.params && typeof op.params[key] === 'number' ? op.params[key] : fallback
 }
 
-function emitOpenQasm(circuit: CircuitIR, dialect: 'qasm2' | 'qasm3'): OpenQasmGenResult {
+function emitOpenQasm(circuit: CircuitState, dialect: 'qasm2' | 'qasm3'): OpenQasmGenResult {
   const numQubits = Math.max(1, circuit.num_qubits || 1)
   const lines: string[] = []
   const lineToGateId: Record<number, string> = {}
@@ -189,10 +189,10 @@ function emitOpenQasm(circuit: CircuitIR, dialect: 'qasm2' | 'qasm3'): OpenQasmG
   }
 }
 
-export function generateOpenQasm2(circuit: CircuitIR): OpenQasmGenResult {
+export function generateOpenQasm2(circuit: CircuitState): OpenQasmGenResult {
   return emitOpenQasm(circuit, 'qasm2')
 }
 
-export function generateOpenQasm3(circuit: CircuitIR): OpenQasmGenResult {
+export function generateOpenQasm3(circuit: CircuitState): OpenQasmGenResult {
   return emitOpenQasm(circuit, 'qasm3')
 }

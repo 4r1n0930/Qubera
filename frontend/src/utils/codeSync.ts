@@ -16,7 +16,6 @@ import type {
   BackendType,
   GateType,
   Framework,
-  CircuitIR,
 } from '../types/quantumLab'
 import { generateOpenQasm2, generateOpenQasm3 } from './openQasm'
 
@@ -367,7 +366,7 @@ export function generatePythonCode(
  * used for the interactive editing loop (never round-tripped through the API).
  */
 export function generateCircuitCode(
-  circuit: CircuitIR,
+  circuit: CircuitState,
   framework: Framework,
   shots = 1000
 ): CodeGenResult {

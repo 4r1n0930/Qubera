@@ -4,11 +4,11 @@
  * without a round trip. Never mutates the input.
  */
 
-import { GATE_CATALOG, type CircuitIR, type CodeError } from '../types/quantumLab'
+import { GATE_CATALOG, type CircuitState, type CodeError } from '../types/quantumLab'
 
 const CATALOG = new Map(GATE_CATALOG.map((g) => [g.type, g]))
 
-export function validateCircuit(ir: CircuitIR): { valid: boolean; errors: CodeError[] } {
+export function validateCircuit(ir: CircuitState): { valid: boolean; errors: CodeError[] } {
   const errors: CodeError[] = []
 
   if (!ir || typeof ir !== 'object' || Array.isArray(ir)) {

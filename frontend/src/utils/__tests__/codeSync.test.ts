@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import type { CircuitIR } from '../../types/quantumLab'
+import type { CircuitState } from '../../types/quantumLab'
 import { generateCircuitCode, generatePythonCode, parsePythonCode } from '../codeSync'
-import { simulateCircuit } from '../quantumSimulator'
 
-const BELL: CircuitIR = {
+const BELL: CircuitState = {
   num_qubits: 2,
   operations: [
     { id: 'g_had', gate: 'H', targets: [0], moment: 0 },
@@ -12,7 +11,7 @@ const BELL: CircuitIR = {
   ],
 }
 
-const PARAM: CircuitIR = {
+const PARAM: CircuitState = {
   num_qubits: 2,
   operations: [
     { id: 'g_rx', gate: 'RX', targets: [0], moment: 0, params: { theta: Math.PI / 2 } },
@@ -107,41 +106,5 @@ describe('loop prevention fixed point', () => {
     const mOps = parsed.circuit.operations.filter((o) => o.gate === 'M')
     expect(mOps.length).toBe(2)
     expect(mOps.map((o) => o.targets[0]).sort()).toEqual([0, 1])
-  })
-
-  it('RXX decomposition matches the direct two-qubit rotation', () => {
-    // RXX(θ) = (H⊗H) · RZZ(θ) · (H⊗H), and the qasm2 generator expands RZZ
-    // as CX(a,b)·Rz(θ)[b]·CX(a,b). Build the expanded qiskit circuit and
-    // confirm the probability distribution matches the direct RXX gate.
-    const direct: CircuitIR = {
-      num_qubits: 2,
-      operations: [
-        { id: 'a', gate: 'H', targets: [0], moment: 0 },
-        { id: 'b', gate: 'RXX', targets: [0, 1], moment: 1, params: { theta: Math.PI } },
-        { id: 'c', gate: 'M', targets: [0], moment: 2 },
-        { id: 'd', gate: 'M', targets: [1], moment: 2 },
-      ],
-    }
-    const expanded: CircuitIR = {
-      num_qubits: 2,
-      operations: [
-        { id: 'a', gate: 'H', targets: [0], moment: 0 },
-        { id: 'b', gate: 'H', targets: [0], moment: 1 },
-        { id: 'c', gate: 'H', targets: [1], moment: 1 },
-        { id: 'd', gate: 'CX', targets: [0, 1], moment: 2 },
-        { id: 'e', gate: 'RZ', targets: [1], moment: 3, params: { theta: Math.PI } },
-        { id: 'f', gate: 'CX', targets: [0, 1], moment: 4 },
-        { id: 'g', gate: 'H', targets: [0], moment: 5 },
-        { id: 'h', gate: 'H', targets: [1], moment: 5 },
-        { id: 'i', gate: 'M', targets: [0], moment: 6 },
-        { id: 'j', gate: 'M', targets: [1], moment: 6 },
-      ],
-    }
-    const directRes = simulateCircuit(direct, 'qiskit', 1).probabilities
-    const expandedRes = simulateCircuit(expanded, 'qiskit', 1).probabilities
-    const keys = new Set([...Object.keys(directRes), ...Object.keys(expandedRes)])
-    for (const key of keys) {
-      expect(Math.abs((directRes[key] ?? 0) - (expandedRes[key] ?? 0))).toBeLessThan(1e-9)
-    }
   })
 })

@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
 import { CircuitBoard, Code2, SplitSquareHorizontal } from 'lucide-react'
 import type {
   CircuitState,
   GateOperation,
   GateType,
-  BackendType,
   ExecutionState,
   Framework,
   UpdateSource,
@@ -14,7 +13,13 @@ import type {
 import { CircuitBuilder } from './CircuitBuilder'
 import { ResultsPanel } from './ResultsPanel'
 import { CodePanel } from './CodePanel'
-import { simulateCircuit } from '../../utils/quantumSimulator'
+import {
+  executeQuantumCircuit,
+  DEFAULT_QUANTUM_OUTPUTS,
+  QuantumExecutionError,
+  type QuantumBackend,
+} from '../../api/quantumApi'
+import { circuitToApiIr } from '../../utils/circuitToApi'
 import { generateCircuitCode } from '../../utils/codeSync'
 import { codeToIrApi, ConversionError } from '../../services/conversionApi'
 import { useDebouncedCallback } from '../../utils/debounce'
@@ -148,11 +153,14 @@ export function QuantumLab() {
   }, [])
 
   const [selectedGateId, setSelectedGateId] = useState<string | null>(null)
-  const [backend, setBackend] = useState<BackendType>('qiskit')
+  const [backend, setBackend] = useState<QuantumBackend>('qiskit')
   const [shots, setShots] = useState<number>(1000)
-  const [runError, setRunError] = useState<string | null>(null)
-  const [runTick, setRunTick] = useState(0)
-  const [isRunning, setIsRunning] = useState(false)
+
+  // Dedicated execution state: results are authoritative Python responses that
+  // persist independently of later circuit edits until the next Run.
+  const [execution, setExecution] = useState<ExecutionState>({ status: 'idle' })
+  const runningRef = useRef(false)
+  const runControllerRef = useRef<AbortController | null>(null)
   const runVersion = useRef(0)
 
   // ---------------- Code ↔ circuit synchronization ----------------
@@ -188,19 +196,6 @@ export function QuantumLab() {
   const numQubits = circuit.num_qubits
   const width = circuitWidth(circuit)
   const ToggleIcon = MODE_META[mode].icon
-
-  // Shared simulation state. Recomputed whenever the circuit structure, backend,
-  // or shot count changes — and on every explicit Run — so the probability
-  // distribution, statevector, and per-qubit Bloch vectors all stay in sync
-  // without a separate second simulation engine.
-  const sharedResult = useMemo(() => {
-    void runTick
-    return simulateCircuit(circuit, backend, shots)
-  }, [circuit, backend, shots, runTick])
-
-  const executionState: ExecutionState = runError
-    ? { status: 'error', error: runError }
-    : { status: 'success', result: sharedResult }
 
   /**
    * circuit → code (local, synchronous). Runs whenever the circuit or target
@@ -369,7 +364,10 @@ export function QuantumLab() {
   const handleClear = useCallback(() => {
     circuitSourceRef.current = 'circuit'
     latestCircuit({ ...circuitRef.current, operations: [] })
-    setRunError(null)
+    const current = runVersion.current
+    runVersion.current = current + 1
+    runControllerRef.current?.abort()
+    setExecution({ status: 'idle' })
     setSelectedGateId(null)
   }, [latestCircuit])
 
@@ -377,30 +375,64 @@ export function QuantumLab() {
     setMode((m) => MODE_ORDER[(MODE_ORDER.indexOf(m) + 1) % MODE_ORDER.length])
   }, [])
 
-  const handleBackendChange = useCallback((b: BackendType) => {
+  const handleBackendChange = useCallback((b: QuantumBackend) => {
     setBackend(b)
-    setRunError(null)
   }, [])
 
   const handleShotsChange = useCallback((s: number) => {
     setShots(s)
-    setRunError(null)
   }, [])
 
-  const handleRun = useCallback(() => {
-    setIsRunning(true)
-    setRunError(null)
-    const current = runVersion.current + 1
-    runVersion.current = current
-
-    window.setTimeout(() => {
-      if (runVersion.current !== current) return
-      setIsRunning(false)
-    }, 400)
-
-    // Trigger a fresh execution pass (new shot samples + runtime).
-    setRunTick((t) => t + 1)
+  // Abort any in-flight execution when the lab unmounts.
+  useEffect(() => {
+    return () => {
+      runControllerRef.current?.abort()
+    }
   }, [])
+
+  /**
+   * Run the current circuit through the Node gateway → Python service.
+   * One execution produces one result object consumed by all visualizations.
+   */
+  const handleRun = useCallback(async () => {
+    if (runningRef.current) return
+    runningRef.current = true
+    runVersion.current += 1
+    const requestId = runVersion.current
+    runControllerRef.current?.abort()
+    const controller = new AbortController()
+    runControllerRef.current = controller
+
+    setExecution({ status: 'loading' })
+
+    try {
+      const result = await executeQuantumCircuit(
+        {
+          backend,
+          shots,
+          circuit: circuitToApiIr(circuitRef.current),
+          output: DEFAULT_QUANTUM_OUTPUTS,
+        },
+        controller.signal
+      )
+      if (requestId !== runVersion.current) return
+      setExecution({ status: 'success', result })
+    } catch (err) {
+      if (controller.signal.aborted || requestId !== runVersion.current) return
+      setExecution({
+        status: 'error',
+        error:
+          err instanceof QuantumExecutionError
+            ? { type: err.type, message: err.message }
+            : { type: 'UNKNOWN', message: 'Quantum execution failed.' },
+      })
+    } finally {
+      if (requestId === runVersion.current) {
+        runningRef.current = false
+        runControllerRef.current = null
+      }
+    }
+  }, [backend, shots])
 
   return (
     <div className="qlab-container qlab-container-new qlab-stage" data-lab-mode={mode}>
@@ -449,14 +481,14 @@ export function QuantumLab() {
 
       <section className="qlab-new-results-section" aria-label="Measurements and results">
         <ResultsPanel
-          executionState={executionState}
+          executionState={execution}
           backend={backend}
           shots={shots}
           numQubits={numQubits}
           onBackendChange={handleBackendChange}
           onShotsChange={handleShotsChange}
           onRun={handleRun}
-          isRunning={isRunning}
+          isRunning={execution.status === 'loading'}
         />
       </section>
     </div>
