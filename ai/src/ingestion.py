@@ -1,39 +1,70 @@
-from pathlib import Path
+import os
 
+from dotenv import load_dotenv
+from pymongo import MongoClient
 
-KNOWLEDGE_BASE_PATH = Path(__file__).resolve().parent.parent / "data" / "knowledge_base"
+load_dotenv()
+
+MONGODB_URI = os.getenv("MONGODB_URI")
+MONGODB_DB = os.getenv("MONGODB_DB")
 
 
 def load_documents():
+
     documents = []
 
-    if not KNOWLEDGE_BASE_PATH.exists():
-        print(f"Knowledge base not found: {KNOWLEDGE_BASE_PATH}")
+    if not MONGODB_URI:
+        print("MONGODB_URI is not configured.")
         return documents
 
-    for file_path in KNOWLEDGE_BASE_PATH.rglob("*.md"):
+    if not MONGODB_DB:
+        print("MONGODB_DB is not configured.")
+        return documents
 
-        try:
-            content = file_path.read_text(encoding="utf-8").strip()
+    try:
+        client = MongoClient(MONGODB_URI)
+
+        # Test connection
+        client.admin.command("ping")
+        print("MongoDB connected successfully.")
+
+        db = client[MONGODB_DB]
+
+        # Qubera lessons collection
+        lessons_collection = db["lessons"]
+
+        # Load all lessons
+        lessons = list(lessons_collection.find({}))
+
+        print(f"Lessons found in MongoDB: {len(lessons)}")
+
+        for lesson in lessons:
+
+            content = lesson.get("content", "")
+
+            if not isinstance(content, str):
+                continue
+
+            content = content.strip()
 
             if not content:
                 continue
 
-            relative_path = file_path.relative_to(KNOWLEDGE_BASE_PATH)
-
-            # First folder represents the category
-            category = relative_path.parts[0] if len(relative_path.parts) > 1 else "general"
-
             documents.append({
                 "content": content,
-                "source": str(relative_path),
-                "filename": file_path.name,
-                "category": category
+                "source": str(lesson.get("_id", "")),
+                "filename": lesson.get("title", "lesson"),
+                "category": str(lesson.get("moduleId", "general")),
+                "lesson_id": str(lesson.get("_id", "")),
+                "module_id": str(lesson.get("moduleId", ""))
             })
 
-        except Exception as e:
-            print(f"Error reading {file_path}: {e}")
+        print(f"Documents loaded: {len(documents)}")
 
-    print(f"Documents loaded: {len(documents)}")
+        client.close()
 
-    return documents
+        return documents
+
+    except Exception as e:
+        print(f"MongoDB connection error: {e}")
+        return documents

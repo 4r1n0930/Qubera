@@ -1,10 +1,16 @@
 import { useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Navigate, Outlet } from 'react-router-dom'
 import { Sidebar } from '../components/dashboard/Sidebar'
 import { TopBar } from '../components/dashboard/TopBar'
+import { useAuth } from '../contexts/AuthContext'
 
 export function DashboardLayout() {
+  const { isAuthenticated } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />
+  }
 
   return (
     <div className="dash-app">
