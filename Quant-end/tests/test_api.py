@@ -203,10 +203,62 @@ class TestKnownStates:
         assert sum(data["counts"].values()) == 100
 
     @pytest.mark.parametrize("backend", ALL_BACKENDS)
-    def test_quarter_x_rotation_is_y_up(self, backend):
+    def test_quarter_x_rotation_maps_zero_to_minus_i(self, backend):
+        # RX(π/2)|0⟩ = |-i⟩ = (|0⟩ − i|1⟩)/√2 → (0, −1, 0) on the Bloch sphere.
         circ = {"num_qubits": 1, "operations": [{"gate": "RX", "targets": [0], "params": [math.pi / 2]}]}
         data = execute({"backend": backend, "shots": 100, "circuit": circ})
+        assert data["bloch_vectors"]["q0"] == {"x": 0.0, "y": -1.0, "z": 0.0}
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_quarter_y_rotation_is_plus_state(self, backend):
+        # RY(π/2)|0⟩ = |+⟩ → (+1, 0, 0) on the Bloch sphere.
+        circ = {"num_qubits": 1, "operations": [{"gate": "RY", "targets": [0], "params": [math.pi / 2]}]}
+        data = execute({"backend": backend, "shots": 100, "circuit": circ})
+        assert data["bloch_vectors"]["q0"] == {"x": 1.0, "y": 0.0, "z": 0.0}
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_positive_i_state_is_plus_y(self, backend):
+        # |+i⟩ = S|+⟩ = (|0⟩ + i|1⟩)/√2 → (0, +1, 0) on the Bloch sphere.
+        circ = {
+            "num_qubits": 1,
+            "operations": [{"gate": "H", "targets": [0]}, {"gate": "S", "targets": [0]}],
+        }
+        data = execute({"backend": backend, "shots": 100, "circuit": circ})
         assert data["bloch_vectors"]["q0"] == {"x": 0.0, "y": 1.0, "z": 0.0}
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_negative_i_state_is_minus_y(self, backend):
+        # |-i⟩ = S†|+⟩ = (|0⟩ − i|1⟩)/√2 → (0, −1, 0) on the Bloch sphere.
+        circ = {
+            "num_qubits": 1,
+            "operations": [{"gate": "H", "targets": [0]}, {"gate": "Sdg", "targets": [0]}],
+        }
+        data = execute({"backend": backend, "shots": 100, "circuit": circ})
+        assert data["bloch_vectors"]["q0"] == {"x": 0.0, "y": -1.0, "z": 0.0}
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_t_gate_on_plus_points_to_y_plus_equator(self, backend):
+        # T|+⟩ = cos(π/8)|0⟩ + e^(iπ/4)sin(π/8)|1⟩ → (cos(π/4), sin(π/4), 0)/√... on equator at φ=45°.
+        circ = {
+            "num_qubits": 1,
+            "operations": [{"gate": "H", "targets": [0]}, {"gate": "T", "targets": [0]}],
+        }
+        data = execute({"backend": backend, "shots": 100, "circuit": circ})
+        vec = data["bloch_vectors"]["q0"]
+        for axis, expected in (("x", 0.70710678), ("y", 0.70710678), ("z", 0.0)):
+            assert vec[axis] == pytest.approx(expected, abs=1e-6)
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_rz_half_pi_on_plus_is_plus_y(self, backend):
+        # RZ(π/2)|+⟩ ∝ |+i⟩ → (0, +1, 0).
+        circ = {
+            "num_qubits": 1,
+            "operations": [{"gate": "H", "targets": [0]}, {"gate": "RZ", "targets": [0], "params": [math.pi / 2]}],
+        }
+        data = execute({"backend": backend, "shots": 100, "circuit": circ})
+        vec = data["bloch_vectors"]["q0"]
+        for axis, expected in (("x", 0.0), ("y", 1.0), ("z", 0.0)):
+            assert vec[axis] == pytest.approx(expected, abs=1e-6)
 
 
 # ─── Mid-circuit reset ────────────────────────────────────────────────────────

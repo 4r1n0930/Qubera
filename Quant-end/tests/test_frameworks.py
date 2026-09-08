@@ -140,6 +140,56 @@ class TestVisualizationHelpers:
         np.testing.assert_allclose(rho, expected, atol=1e-12)
 
 
+# Visualization gate states: each gate, applied to |0⟩ (Bloch north pole),
+# must land the Bloch vector on its mathematically correct location.
+VISUALIZATION_STATES = [
+    pytest.param("H", [], (1.0, 0.0, 0.0), id="H"),
+    pytest.param("X", [], (0.0, 0.0, -1.0), id="X"),
+    pytest.param("Y", [], (0.0, 0.0, -1.0), id="Y"),
+    pytest.param("Z", [], (0.0, 0.0, 1.0), id="Z"),
+    pytest.param("S", [], (0.0, 0.0, 1.0), id="S"),
+    pytest.param("T", [], (0.0, 0.0, 1.0), id="T"),
+    pytest.param("RX", [math.pi / 4], (0.0, -math.sin(math.pi / 4), math.cos(math.pi / 4)), id="RX-pi-4"),
+    pytest.param("RY", [math.pi / 4], (math.sin(math.pi / 4), 0.0, math.cos(math.pi / 4)), id="RY-pi-4"),
+]
+
+# H |0⟩ = |+⟩, then RZ(π/2) rotates the azimuth to +90° → (0, +1, 0).
+EQUATOR_ROTATIONS = [
+    pytest.param("H", "RZ", [math.pi / 2], (0.0, 1.0, 0.0), id="RZ-pi-2-after-H"),
+]
+
+
+class TestVisualizationGateStates:
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    @pytest.mark.parametrize("gate,params,expected", VISUALIZATION_STATES)
+    def test_gate_from_zero_lands_on_expected_bloch_point(self, backend, gate, params, expected):
+        ops = [{"gate": gate, "targets": [0]}]
+        if params:
+            ops[0]["params"] = params
+        circ = as_circuit({"num_qubits": 1, "operations": ops})
+        sv = make_backend(backend).statevector(circ)
+        bloch = bloch_vectors_from_statevector(sv, 1)["q0"]
+        assert abs(bloch["x"] - expected[0]) < 1e-6
+        assert abs(bloch["y"] - expected[1]) < 1e-6
+        assert abs(bloch["z"] - expected[2]) < 1e-6
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    @pytest.mark.parametrize("pre,phase,params,expected", EQUATOR_ROTATIONS)
+    def test_phase_rotation_moves_azimuth(self, backend, pre, phase, params, expected):
+        circ = as_circuit({
+            "num_qubits": 1,
+            "operations": [
+                {"gate": pre, "targets": [0]},
+                {"gate": phase, "targets": [0], "params": params},
+            ],
+        })
+        sv = make_backend(backend).statevector(circ)
+        bloch = bloch_vectors_from_statevector(sv, 1)["q0"]
+        assert abs(bloch["x"] - expected[0]) < 1e-6
+        assert abs(bloch["y"] - expected[1]) < 1e-6
+        assert abs(bloch["z"] - expected[2]) < 1e-6
+
+
 class TestParameterizedGates:
     @pytest.mark.parametrize("backend", ALL_BACKENDS)
     def test_rx_pi_flips_qubit(self, backend):

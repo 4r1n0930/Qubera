@@ -44,13 +44,24 @@ def bloch_vectors_from_statevector(statevector: np.ndarray, num_qubits: int) -> 
     density matrix obtained by partial trace, so it correctly captures
     superpositions and entanglement (it is not derived from Z-basis
     probabilities alone).
+
+    Convention: for a pure state |ψ⟩ = α|0⟩ + β|1⟩ the vector components are
+        x = 2·Re(α*β)
+        y = 2·Im(α*β)
+        z = |α|² − |β|²
+    so that |0⟩ → +Z, |1⟩ → −Z, |+⟩ → +X, |−⟩ → −X, |+i⟩ → +Y, |-i⟩ → −Y.
+
+    In density-matrix terms ρ = [[|α|², α·β*], [α*·β, |β|²]], so the |1⟩-|0⟩
+    cross term is ρ[0,1] = α·β* = conj(α*·β). The y-component therefore picks
+    up a minus sign relative to rho's off-diagonal imaginary part:
+        y = 2·Im(α*β) = −2·Im(ρ[0,1]).
     """
     vectors: dict[str, dict] = {}
     for qubit in range(num_qubits):
         rho = qubit_reduced_density_matrix(statevector, qubit, num_qubits)
         vectors[f"q{qubit}"] = {
             "x": round(2 * rho[0, 1].real, _BLOCH_PRECISION),
-            "y": round(2 * rho[0, 1].imag, _BLOCH_PRECISION),
+            "y": round(-2 * rho[0, 1].imag, _BLOCH_PRECISION),
             "z": round((rho[0, 0] - rho[1, 1]).real, _BLOCH_PRECISION),
         }
     return vectors

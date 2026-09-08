@@ -9,6 +9,12 @@ const userSchema = new mongoose.Schema(
       sparse: true,
     },
 
+    githubId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+
     name: {
       type: String,
       required: true,
