@@ -1883,7 +1883,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
   padding: var(--space-3);
 }
 
@@ -1955,9 +1955,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: var(--space-2);
-  overflow: hidden;
 }
 
 /* Chart / chart-row styling */
@@ -2026,8 +2025,17 @@
   justify-content: center;
   gap: var(--space-2);
   width: 100%;
-  height: 100%;
-  min-height: 0;
+  min-height: 100%;
+  margin-block: auto;
+}
+.qlab-bloch-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  max-width: 310px;
 }
 .qlab-bloch-label {
   flex-shrink: 0;
@@ -2037,27 +2045,57 @@
   text-transform: uppercase;
   color: var(--color-text-primary);
 }
+.qlab-bloch-reset {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+.qlab-bloch-reset:hover {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary-soft-border);
+  color: var(--color-primary);
+}
 .qlab-bloch-sub {
   flex-shrink: 0;
   font-size: var(--text-caption);
   color: var(--color-text-muted);
+  text-align: center;
 }
 .qlab-bloch-svg {
   flex: 1 1 auto;
   min-height: 0;
   width: 100%;
-  max-width: 260px;
-  max-height: 260px;
+  max-width: 300px;
+  max-height: 300px;
   aspect-ratio: 1 / 1;
   cursor: grab;
   user-select: none;
 }
 .qlab-bloch-svg:active { cursor: grabbing; }
 .qlab-bloch-axis {
-  font-size: 11px;
-  font-weight: var(--font-weight-semibold);
-  fill: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: var(--font-weight-bold);
 }
+.qlab-bloch-axis.is-front { fill: var(--color-text-secondary); }
+.qlab-bloch-axis.is-back { fill: var(--color-border-strong); }
+.qlab-bloch-state-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+}
+.qlab-bloch-state-label.is-front { fill: var(--color-text-muted); }
+.qlab-bloch-state-label.is-back { fill: var(--color-border-strong); }
 
 /* Qubit selector above the Bloch sphere for multi-qubit circuits */
 .qlab-bloch-qubit-select {
@@ -2092,54 +2130,65 @@
   color: var(--color-primary);
 }
 
-/* Coordinates summary line */
-.qlab-bloch-coords {
-  font-family: var(--font-mono);
-  text-align: center;
-}
-
-/* Debug / state-details toggle */
-.qlab-bloch-info-toggle {
+/* Educational state panel (coordinates, purity, angles) */
+.qlab-bloch-panel {
   flex-shrink: 0;
-  border: none;
-  background: transparent;
-  padding: 2px 6px;
-  font-size: var(--text-caption);
-  color: var(--color-text-muted);
-  cursor: pointer;
-  border-radius: var(--radius-sm);
-}
-.qlab-bloch-info-toggle:hover {
-  background: var(--color-surface-muted);
-  color: var(--color-primary);
-}
-.qlab-bloch-info {
   width: 100%;
-  max-width: 230px;
-  max-height: 45%;
-  overflow-y: auto;
+  max-width: 310px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: var(--color-surface-muted);
+  background: var(--color-surface);
   padding: var(--space-2) var(--space-3);
-  font-size: var(--text-caption);
-  font-family: var(--font-mono);
-  color: var(--color-text-secondary);
 }
-.qlab-bloch-info-row {
+.qlab-bloch-panel-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: 1px 0;
+  gap: var(--space-2);
 }
-.qlab-bloch-info-row code {
+.qlab-bloch-panel-key {
+  flex-shrink: 0;
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  min-width: 78px;
+}
+.qlab-bloch-panel-val {
+  font-size: var(--text-caption);
   color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
 }
-.qlab-bloch-info-divider {
-  height: 1px;
-  background: var(--color-border);
-  margin: var(--space-1) 0;
+.qlab-bloch-panel-main {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary);
+}
+.qlab-bloch-badge {
+  margin-left: auto;
+  font-size: 0.625rem;
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+}
+.qlab-bloch-badge.pure {
+  background: var(--color-primary-soft);
+  border: 1px solid var(--color-primary-soft-border);
+  color: var(--color-primary);
+}
+.qlab-bloch-badge.mixed {
+  background: var(--color-secondary-soft);
+  border: 1px solid var(--color-border);
+  color: var(--color-secondary);
+}
+.qlab-bloch-badge.maximally-mixed {
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
 }
 
 .qlab-results-chart-wrap {
@@ -2442,8 +2491,7 @@
   flex-direction: column;
   gap: var(--space-3);
   width: 100%;
-  height: 100%;
-  min-height: 0;
+  min-height: 100%;
   padding: var(--space-1) 0;
 }
 
@@ -2503,7 +2551,6 @@
   flex-direction: column;
   gap: var(--space-3);
   min-height: 0;
-  overflow: hidden;
 }
 
 /* ── Header ──────────────────────────────────────────────────── */
@@ -2705,6 +2752,23 @@
 }
 .q-sv-mono {
   font-family: var(--font-mono);
+}
+
+/* Amplitude cell in the statevector table */
+.q-sv-amp {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Measurement counts — the primary empirical value in the statevector view */
+.q-sv-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary);
+}
+.q-sv-count-na {
+  font-style: italic;
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-regular);
 }
 
 /* ── Info icon ───────────────────────────────────────────────── */

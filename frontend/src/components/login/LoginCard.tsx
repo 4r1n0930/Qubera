@@ -12,10 +12,7 @@ interface LoginCardProps {
   /** Backend/API error shown below the login form. */
   formError?: string;
 
-  /** Placeholder for Google social login. */
-  onGoogleLogin: () => void;
-
-  /** Placeholder for GitHub social login. */
+  /** Handler for GitHub social login. */
   onGithubLogin: () => void;
 
   /** Placeholder for forgot-password navigation. */
@@ -28,7 +25,6 @@ interface LoginCardProps {
 export function LoginCard({
   onLogin,
   formError,
-  onGoogleLogin,
   onGithubLogin,
   onForgotPassword,
   onCreateAccount,
@@ -51,10 +47,6 @@ export function LoginCard({
 
       <div className="mt-7">
         <SocialLogin
-          onGoogleLogin={(e) => {
-            e.preventDefault();
-            onGoogleLogin();
-          }}
           onGithubLogin={(e) => {
             e.preventDefault();
             onGithubLogin();

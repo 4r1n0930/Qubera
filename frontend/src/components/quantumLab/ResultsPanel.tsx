@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Activity, Loader2, Minus, Play, Plus } from 'lucide-react'
-import type { ExecutionState, BlochVector } from '../../types/quantumLab'
+import type { ExecutionState } from '../../types/quantumLab'
 import type { QuantumBackend } from '../../api/quantumApi'
+import type { QubitVisualization } from '../../utils/blochMath'
+import { deriveQubitVisualization } from '../../utils/blochMath'
 import { BlochSphere } from './BlochSphere'
 import { StateVectorVisualization } from './StateVectorVisualization'
 
@@ -60,17 +62,15 @@ export function ResultsPanel({
   const result = executionState.status === 'success' ? executionState.result : undefined
   const blochVectors = result?.bloch_vectors
 
-  // Fallback to the initial |0…0⟩ state until a backend result exists.
-  const bloch = blochVectors?.[`q${selectedQubit}`] ?? {
-    x: 0,
-    y: 0,
-    z: 1,
-  }
-
-  // Marginal P(0) / P(1) for the selected qubit, derived deterministically
-  // from the returned Bloch z-coordinate.
-  const probability1 = clamp01((1 - (bloch as BlochVector).z) / 2)
-  const probability0 = 1 - probability1
+  // The selected qubit's Bloch state, derived from the authoritative backend
+  // output: the server-computed `bloch_vectors` (reduced density matrix) or,
+  // failing that, the full statevector. Before any run we show the |0…0⟩ start.
+  const info: QubitVisualization = deriveQubitVisualization({
+    vector: blochVectors?.[`q${selectedQubit}`],
+    statevector: result?.statevector,
+    qubit: selectedQubit,
+    numQubits,
+  })
 
   return (
     <div className="qlab-results">
@@ -172,19 +172,56 @@ export function ResultsPanel({
             numQubits={numQubits}
             selectedQubit={selectedQubit}
             setSelectedQubit={setSelectedQubit}
-            blochVector={bloch}
-            probability0={probability0}
-            probability1={probability1}
+            info={info}
           />
         )}
-        {view === 'sv' && <StateVectorVisualization statevector={result?.statevector} />}
+        {view === 'sv' && (
+          <StateVectorVisualization
+            statevector={result?.statevector}
+            counts={result?.counts}
+            shots={result?.shots}
+          />
+        )}
       </div>
     </div>
   )
 }
 
-function clamp01(value: number): number {
-  return Math.min(1, Math.max(0, value))
+function BSView({
+  numQubits,
+  selectedQubit,
+  setSelectedQubit,
+  info,
+}: {
+  numQubits: number
+  selectedQubit: number
+  setSelectedQubit: (q: number) => void
+  info: QubitVisualization
+}) {
+  return (
+    <div className="qlab-results-bloch">
+      {numQubits > 1 && (
+        <div className="qlab-bloch-qubit-select" role="tablist" aria-label="Select qubit">
+          {Array.from({ length: numQubits }, (_, q) => (
+            <button
+              key={q}
+              type="button"
+              role="tab"
+              aria-selected={selectedQubit === q}
+              className={`qlab-bloch-qubit-btn ${selectedQubit === q ? 'is-active' : ''}`}
+              onClick={() => setSelectedQubit(q)}
+            >
+              q{q}
+            </button>
+          ))}
+        </div>
+      )}
+      <BlochSphere
+        info={info}
+        label={`q${selectedQubit}`}
+      />
+    </div>
+  )
 }
 
 /* ------------------------------------------------------------------ */
@@ -260,53 +297,6 @@ function PDView({ state }: { state: ExecutionState }) {
           )
         })}
       </div>
-    </div>
-  )
-}
-
-/* ------------------------------------------------------------------ */
-/*  BS — Bloch Sphere (minimal chrome)                                */
-/* ------------------------------------------------------------------ */
-
-function BSView({
-  numQubits,
-  selectedQubit,
-  setSelectedQubit,
-  blochVector,
-  probability0,
-  probability1,
-}: {
-  numQubits: number
-  selectedQubit: number
-  setSelectedQubit: (q: number) => void
-  blochVector: BlochVector
-  probability0: number
-  probability1: number
-}) {
-  return (
-    <div className="qlab-results-bloch">
-      {numQubits > 1 && (
-        <div className="qlab-bloch-qubit-select" role="tablist" aria-label="Select qubit">
-          {Array.from({ length: numQubits }, (_, q) => (
-            <button
-              key={q}
-              type="button"
-              role="tab"
-              aria-selected={selectedQubit === q}
-              className={`qlab-bloch-qubit-btn ${selectedQubit === q ? 'is-active' : ''}`}
-              onClick={() => setSelectedQubit(q)}
-            >
-              q{q}
-            </button>
-          ))}
-        </div>
-      )}
-      <BlochSphere
-        vector={blochVector}
-        probability0={probability0}
-        probability1={probability1}
-        label={`q${selectedQubit}`}
-      />
     </div>
   )
 }

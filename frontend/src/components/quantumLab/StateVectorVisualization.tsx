@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Info } from 'lucide-react'
 import { Tooltip } from '../common/Tooltip'
+import type { ComplexAmplitude } from '../../api/quantumApi'
 
 /* ------------------------------------------------------------------ */
 /*  Derived display row (authoritative data only)                      */
@@ -12,7 +13,10 @@ interface BasisState {
   imag: number
   magnitude: number
   phase: number
-  probability: number
+  /** Measurement count from the simulator's shot-based execution. */
+  count: number | undefined
+  /** Whether the backend actually produced counts for this run. */
+  hasCounts: boolean
 }
 
 type Tab = 'chart' | 'table'
@@ -27,13 +31,18 @@ const TABS: { id: Tab; label: string }[] = [
 /* ------------------------------------------------------------------ */
 
 function fmt(v: number): string {
-  return v.toFixed(4).replace(/^-0\./, '0.')
+  const cleaned = Math.abs(v) < 1e-12 ? 0 : v
+  return cleaned.toFixed(4).replace(/^-0\./, '0.')
 }
 
-function fmtPct(v: number): string {
-  if (v === 0) return '0%'
-  const pct = v * 100
-  return pct % 1 === 0 ? `${pct.toFixed(0)}%` : `${pct.toFixed(1)}%`
+function fmtCount(value: number | undefined): string {
+  return value === undefined ? '—' : value.toLocaleString('en-US')
+}
+
+function complexString(real: number, imag: number): string {
+  const r = fmt(real)
+  const i = fmt(Math.abs(imag))
+  return `${r} ${imag < 0 ? '−' : '+'} ${i}i`
 }
 
 /* ------------------------------------------------------------------ */
@@ -55,16 +64,22 @@ function InfoTip({ text }: { text: string }) {
 /* ------------------------------------------------------------------ */
 
 interface Props {
-  statevector?: { real: number; imag: number }[]
+  statevector?: ComplexAmplitude[]
+  /** Bitstring-keyed measurement counts from the simulator. */
+  counts?: Record<string, number>
+  /** Number of shots used for the (optional) counts. */
+  shots?: number
 }
 
-export function StateVectorVisualization({ statevector }: Props) {
+export function StateVectorVisualization({ statevector, counts, shots }: Props) {
   const [selectedIdx, setSelectedIdx] = useState(0)
-  const [activeTab, setActiveTab] = useState<Tab>('chart')
+  const [activeTab, setActiveTab] = useState<Tab>('table')
 
   const numQubits = statevector && statevector.length > 0
     ? Math.max(1, Math.round(Math.log2(statevector.length)))
     : 0
+
+  const hasCounts = Boolean(counts)
 
   const data = useMemo<BasisState[]>(() => {
     if (!statevector) return []
@@ -79,12 +94,13 @@ export function StateVectorVisualization({ statevector }: Props) {
         imag: amp.imag,
         magnitude,
         phase,
-        probability: magnitude ** 2,
+        count: counts?.[label],
+        hasCounts,
       }
     })
-  }, [statevector, numQubits])
+  }, [statevector, counts, numQubits, hasCounts])
 
-  // Selection clamps to the current data length; no reset-side-effect needed.
+  // Selection clamps to the current data length.
   const safeIdx = data.length === 0 ? 0 : Math.min(selectedIdx, data.length - 1)
   const selected = data[safeIdx]
   const maxAbs = Math.max(...data.map((d) => Math.abs(d.real)), 0.0001)
@@ -95,7 +111,7 @@ export function StateVectorVisualization({ statevector }: Props) {
         <p className="q-sv-empty-title">No statevector yet</p>
         <p className="q-sv-empty-desc">
           Run a circuit and request the <strong>statevector</strong> output to see exact complex
-          amplitudes for every computational-basis state.
+          amplitudes and measurement counts for every computational-basis state.
         </p>
       </div>
     )
@@ -180,28 +196,35 @@ export function StateVectorVisualization({ statevector }: Props) {
                 <span className="q-sv-selected-label">
                   Amplitude <InfoTip text="Complex amplitude α = a + bi describes both magnitude and phase of a basis state." />
                 </span>
-                <span className="q-sv-selected-value q-sv-mono">
-                  {fmt(selected.real)} {selected.imag >= 0 ? '+' : ''} {fmt(selected.imag)}i
-                </span>
+                <span className="q-sv-selected-value q-sv-mono">{complexString(selected.real, selected.imag)}</span>
               </div>
               <div className="q-sv-selected-item">
                 <span className="q-sv-selected-label">
-                  Magnitude <InfoTip text="The absolute value of the complex amplitude: |α| = √(a² + b²)." />
+                  Real part <InfoTip text="Re(α): the real component of the complex amplitude." />
                 </span>
-                <span className="q-sv-selected-value q-sv-mono">{fmt(selected.magnitude)}</span>
+                <span className="q-sv-selected-value q-sv-mono">{fmt(selected.real)}</span>
               </div>
               <div className="q-sv-selected-item">
                 <span className="q-sv-selected-label">
-                  Phase <InfoTip text="The argument of the complex amplitude in degrees: φ = atan2(b, a)." />
+                  Imaginary part <InfoTip text="Im(α): the imaginary component of the complex amplitude." />
                 </span>
-                <span className="q-sv-selected-value q-sv-mono">{selected.phase}°</span>
+                <span className="q-sv-selected-value q-sv-mono">{fmt(selected.imag)}</span>
               </div>
-              <div className="q-sv-selected-item">
-                <span className="q-sv-selected-label">
-                  Probability <InfoTip text="Measurement probability: P = |α|². The likelihood of measuring this basis state." />
-                </span>
-                <span className="q-sv-selected-value q-sv-mono q-sv-prob">{fmtPct(selected.probability)}</span>
-              </div>
+              {selected.hasCounts ? (
+                <div className="q-sv-selected-item">
+                  <span className="q-sv-selected-label">
+                    Measurement Count <InfoTip text={`Number of shots that measured this basis state out of ${shots ?? '—'} total.`} />
+                  </span>
+                  <span className="q-sv-selected-value q-sv-mono q-sv-count">{fmtCount(selected.count)}</span>
+                </div>
+              ) : (
+                <div className="q-sv-selected-item">
+                  <span className="q-sv-selected-label">
+                    Measurement Count <InfoTip text="The simulator did not return counts for this run." />
+                  </span>
+                  <span className="q-sv-selected-value q-sv-mono q-sv-count-na">unavailable</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -215,13 +238,24 @@ export function StateVectorVisualization({ statevector }: Props) {
               <thead>
                 <tr>
                   <th>Basis State</th>
-                  <th>Real</th>
-                  <th>Imaginary</th>
                   <th>
-                    Magnitude <InfoTip text="|α| = √(Re² + Im²)" />
+                    Amplitude <InfoTip text="Complex amplitude a + bi (α) of this basis state." />
                   </th>
                   <th>
-                    Probability <InfoTip text="P = |α|²" />
+                    Real <InfoTip text="Re(α)" />
+                  </th>
+                  <th>
+                    Imaginary <InfoTip text="Im(α)" />
+                  </th>
+                  <th>
+                    Counts{' '}
+                    <InfoTip
+                      text={
+                        hasCounts
+                          ? `Measurement counts from ${shots?.toLocaleString('en-US') ?? '—'} simulator shots.`
+                          : 'Counts are unavailable — shot-based execution was not requested for this run.'
+                      }
+                    />
                   </th>
                 </tr>
               </thead>
@@ -233,10 +267,10 @@ export function StateVectorVisualization({ statevector }: Props) {
                     onClick={() => setSelectedIdx(data.indexOf(s))}
                   >
                     <td className="q-sv-mono">|{s.label}⟩</td>
+                    <td className="q-sv-mono q-sv-amp">{complexString(s.real, s.imag)}</td>
                     <td className="q-sv-mono">{fmt(s.real)}</td>
                     <td className="q-sv-mono">{fmt(s.imag)}</td>
-                    <td className="q-sv-mono">{fmt(s.magnitude)}</td>
-                    <td className="q-sv-mono">{fmtPct(s.probability)}</td>
+                    <td className="q-sv-mono q-sv-count">{fmtCount(s.count)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -245,9 +279,20 @@ export function StateVectorVisualization({ statevector }: Props) {
 
           <div className="q-sv-footer-edu">
             <span>
-              <InfoTip text="Computational basis states are the standard |0⟩, |1⟩ … basis for qubits." />{' '}
-              Click a row to inspect its computational-basis state.
+              <InfoTip text="Computational basis states are the standard |0⟩, |1⟩ … basis for qubits; click a row to inspect its amplitude." />{' '}
+              Click a row to inspect its basis state.
             </span>
+            {hasCounts ? (
+              <span>
+                <InfoTip text="Counts are the raw measurement outcomes of shot-based execution; each row's count comes straight from the simulator, never estimated." />{' '}
+                Counts from {shots?.toLocaleString('en-US') ?? 'the simulator'} shots.
+              </span>
+            ) : (
+              <span>
+                <InfoTip text="Only the exact statevector was requested, so no measurement counts are available for this run." />{' '}
+                Counts unavailable for this run.
+              </span>
+            )}
           </div>
         </div>
       )}
