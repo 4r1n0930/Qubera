@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Activity, Loader2, Minus, Play, Plus } from 'lucide-react'
 import type { ExecutionState } from '../../types/quantumLab'
-import type { QuantumBackend } from '../../api/quantumApi'
+import type { QuantumBackend, ComplexAmplitude } from '../../api/quantumApi'
 import type { QubitVisualization } from '../../utils/blochMath'
-import { deriveQubitVisualization } from '../../utils/blochMath'
+import { deriveQubitVisualization, deriveAllQubitVisualizations } from '../../utils/blochMath'
 import { BlochSphere } from './BlochSphere'
 import { StateVectorVisualization } from './StateVectorVisualization'
 
@@ -11,7 +11,7 @@ type ViewType = 'pd' | 'bs' | 'sv'
 
 const VIEW_OPTIONS: { value: ViewType; label: string }[] = [
   { value: 'pd', label: 'Probability Distribution' },
-  { value: 'bs', label: 'Bloch Sphere' },
+  { value: 'bs', label: 'Bloch & Q-Sphere (3D)' },
   { value: 'sv', label: 'State Vector' },
 ]
 
@@ -53,7 +53,7 @@ export function ResultsPanel({
   isRunning,
 }: ResultsPanelProps) {
   const [view, setView] = useState<ViewType>('pd')
-  const [selectedQubit, setSelectedQubit] = useState(0)
+  const [selectedQubit, setSelectedQubit] = useState<number | 'all'>('all')
 
   const stepShots = (delta: number) => {
     onShotsChange(Math.min(SHOT_MAX, Math.max(SHOT_MIN, shots + delta)))
@@ -62,15 +62,20 @@ export function ResultsPanel({
   const result = executionState.status === 'success' ? executionState.result : undefined
   const blochVectors = result?.bloch_vectors
 
-  // The selected qubit's Bloch state, derived from the authoritative backend
-  // output: the server-computed `bloch_vectors` (reduced density matrix) or,
-  // failing that, the full statevector. Before any run we show the |0…0⟩ start.
+  const activeIdx = selectedQubit === 'all' ? 0 : selectedQubit
+
+  // The selected qubit's Bloch state, derived from the authoritative backend output
   const info: QubitVisualization = deriveQubitVisualization({
-    vector: blochVectors?.[`q${selectedQubit}`],
+    vector: blochVectors?.[`q${activeIdx}`],
     statevector: result?.statevector,
-    qubit: selectedQubit,
+    qubit: activeIdx,
     numQubits,
   })
+
+  // Visualizations for all circuit qubits simultaneously
+  const allQubits: QubitVisualization[] = useMemo(() => {
+    return deriveAllQubitVisualizations(numQubits, blochVectors, result?.statevector)
+  }, [numQubits, blochVectors, result?.statevector])
 
   return (
     <div className="qlab-results">
@@ -173,6 +178,8 @@ export function ResultsPanel({
             selectedQubit={selectedQubit}
             setSelectedQubit={setSelectedQubit}
             info={info}
+            allQubits={allQubits}
+            statevector={result?.statevector}
           />
         )}
         {view === 'sv' && (
@@ -192,16 +199,30 @@ function BSView({
   selectedQubit,
   setSelectedQubit,
   info,
+  allQubits,
+  statevector,
 }: {
   numQubits: number
-  selectedQubit: number
-  setSelectedQubit: (q: number) => void
+  selectedQubit: number | 'all'
+  setSelectedQubit: (q: number | 'all') => void
   info: QubitVisualization
+  allQubits: QubitVisualization[]
+  statevector?: ComplexAmplitude[]
 }) {
   return (
     <div className="qlab-results-bloch">
       {numQubits > 1 && (
         <div className="qlab-bloch-qubit-select" role="tablist" aria-label="Select qubit">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={selectedQubit === 'all'}
+            className={`qlab-bloch-qubit-btn ${selectedQubit === 'all' ? 'is-active' : ''}`}
+            onClick={() => setSelectedQubit('all')}
+            title="Visualize all circuit qubits simultaneously on 1 sphere"
+          >
+            All Qubits (1 Sphere)
+          </button>
           {Array.from({ length: numQubits }, (_, q) => (
             <button
               key={q}
@@ -218,7 +239,12 @@ function BSView({
       )}
       <BlochSphere
         info={info}
-        label={`q${selectedQubit}`}
+        allQubits={allQubits}
+        statevector={statevector}
+        selectedQubit={selectedQubit}
+        label={selectedQubit === 'all' ? 'All Qubits' : `q${selectedQubit}`}
+        numQubits={numQubits}
+        onSelectQubit={setSelectedQubit}
       />
     </div>
   )

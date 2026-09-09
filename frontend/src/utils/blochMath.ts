@@ -277,3 +277,188 @@ export function formatCoord(value: number, decimals = 3): string {
 export function formatBloch(vector: BlochVector, decimals = 2): string {
   return `(${formatCoord(vector.x, decimals)}, ${formatCoord(vector.y, decimals)}, ${formatCoord(vector.z, decimals)})`
 }
+
+/* ------------------------------------------------------------------ */
+/*  Phase Color & Multi-Qubit Q-Sphere Utilities                      */
+/* ------------------------------------------------------------------ */
+
+export const QUBIT_PALETTE = [
+  '#38bdf8', // q0: Sky blue
+  '#a855f7', // q1: Purple
+  '#10b981', // q2: Emerald
+  '#f59e0b', // q3: Amber
+  '#ec4899', // q4: Pink
+  '#6366f1', // q5: Indigo
+  '#14b8a6', // q6: Teal
+  '#ef4444', // q7: Red
+]
+
+/**
+ * Maps a phase angle in radians to a hue in degrees [0, 360).
+ * 0 rad (real +) -> 0° (red/coral)
+ * π/2 rad (imag +i) -> 90° (gold/chartreuse)
+ * π rad (real -) -> 180° (cyan/teal)
+ * -π/2 rad (imag -i) -> 270° (violet/purple)
+ */
+export function phaseToHue(phaseRad: number): number {
+  if (isNaN(phaseRad)) return 0
+  const deg = (phaseRad * 180) / Math.PI
+  return ((deg % 360) + 360) % 360
+}
+
+/** Converts HSL (h in [0, 360], s in [0, 100], l in [0, 100]) to 24-bit RGB integer. */
+export function hslToHex(h: number, s: number, l: number): number {
+  const lNorm = l / 100
+  const a = (s * Math.min(lNorm, 1 - lNorm)) / 100
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12
+    const color = lNorm - a * Math.max(Math.min(k - 3, 9 - k, 1), -1)
+    return Math.round(255 * color)
+  }
+  return (f(0) << 16) | (f(8) << 8) | f(4)
+}
+
+/**
+ * Converts a quantum phase angle (in radians) into an HSL color string.
+ */
+export function phaseToColor(phaseRad: number, saturation = 90, lightness = 55): string {
+  const hue = Math.round(phaseToHue(phaseRad))
+  return `hsl(${hue}, ${saturation}%, ${lightness}%)`
+}
+
+/** Converts a quantum phase angle (in radians) into a 24-bit hex number for Three.js. */
+export function phaseToHexColor(phaseRad: number, saturation = 90, lightness = 55): number {
+  const hue = phaseToHue(phaseRad)
+  return hslToHex(hue, saturation, lightness)
+}
+
+export interface QSphereBasisState {
+  index: number
+  label: string
+  hammingWeight: number
+  thetaRad: number
+  phiRad: number
+  x: number
+  y: number
+  z: number
+  amplitude: ComplexAmplitude
+  magnitude: number
+  probability: number
+  phaseRad: number
+  phaseDeg: number
+  color: string
+  hexColor: number
+}
+
+function countSetBits(n: number): number {
+  let count = 0
+  let temp = n
+  while (temp > 0) {
+    count += temp & 1
+    temp >>= 1
+  }
+  return count
+}
+
+/**
+ * Computes the 3D surface coordinates, amplitudes, probabilities, and phase colors
+ * for all computational basis states of an N-qubit quantum state on a Q-Sphere.
+ */
+export function getQSphereBasisStates(
+  numQubits: number,
+  statevector?: ComplexAmplitude[]
+): QSphereBasisState[] {
+  const n = Math.max(1, numQubits)
+  const total = 1 << n
+
+  // Group states by Hamming weight
+  const weightGroups = new Map<number, number[]>()
+  for (let i = 0; i < total; i++) {
+    const w = countSetBits(i)
+    if (!weightGroups.has(w)) weightGroups.set(w, [])
+    weightGroups.get(w)!.push(i)
+  }
+
+  const result: QSphereBasisState[] = []
+
+  for (let i = 0; i < total; i++) {
+    const w = countSetBits(i)
+    const group = weightGroups.get(w) ?? [i]
+    const m = group.indexOf(i)
+    const kCount = group.length
+
+    let thetaRad = 0
+    let phiRad = 0
+
+    if (n === 1) {
+      thetaRad = w === 0 ? 0 : Math.PI
+      phiRad = 0
+    } else if (w === 0) {
+      thetaRad = 0
+      phiRad = 0
+    } else if (w === n) {
+      thetaRad = Math.PI
+      phiRad = 0
+    } else {
+      thetaRad = (w / n) * Math.PI
+      phiRad = (2 * Math.PI * m) / kCount
+    }
+
+    const x = clean(Math.sin(thetaRad) * Math.cos(phiRad))
+    const y = clean(Math.sin(thetaRad) * Math.sin(phiRad))
+    const z = clean(Math.cos(thetaRad))
+
+    const amp = statevector && statevector.length === total
+      ? statevector[i]
+      : i === 0
+      ? { real: 1, imag: 0 }
+      : { real: 0, imag: 0 }
+
+    const mag = Math.sqrt(amp.real * amp.real + amp.imag * amp.imag)
+    const prob = clean(mag * mag)
+    const phaseRad = Math.atan2(amp.imag, amp.real)
+    const phaseDeg = normalizeDeg((phaseRad * 180) / Math.PI)
+
+    result.push({
+      index: i,
+      label: i.toString(2).padStart(n, '0'),
+      hammingWeight: w,
+      thetaRad,
+      phiRad,
+      x,
+      y,
+      z,
+      amplitude: amp,
+      magnitude: mag,
+      probability: prob,
+      phaseRad,
+      phaseDeg,
+      color: phaseToColor(phaseRad),
+      hexColor: phaseToHexColor(phaseRad),
+    })
+  }
+
+  return result
+}
+
+/**
+ * Derives visualization objects for all qubits in the circuit simultaneously.
+ */
+export function deriveAllQubitVisualizations(
+  numQubits: number,
+  blochVectors?: Record<string, BlochVector>,
+  statevector?: ComplexAmplitude[]
+): QubitVisualization[] {
+  const result: QubitVisualization[] = []
+  for (let q = 0; q < numQubits; q++) {
+    result.push(
+      deriveQubitVisualization({
+        vector: blochVectors?.[`q${q}`],
+        statevector,
+        qubit: q,
+        numQubits,
+      })
+    )
+  }
+  return result
+}

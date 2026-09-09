@@ -2027,6 +2027,7 @@
   width: 100%;
   min-height: 100%;
   margin-block: auto;
+  position: relative;
 }
 .qlab-bloch-header {
   flex-shrink: 0;
@@ -2035,7 +2036,13 @@
   justify-content: space-between;
   gap: var(--space-3);
   width: 100%;
-  max-width: 310px;
+  max-width: 520px;
+  flex-wrap: wrap;
+}
+.qlab-bloch-header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 .qlab-bloch-label {
   flex-shrink: 0;
@@ -2044,6 +2051,51 @@
   letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
   color: var(--color-text-primary);
+}
+.qlab-bloch-phase-badge {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-bold);
+  color: #ffffff;
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+.qlab-bloch-controls-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.qlab-bloch-toggle-group {
+  display: inline-flex;
+  align-items: center;
+  background: var(--color-surface-muted);
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+}
+.qlab-bloch-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--radius-sm) - 2px);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+.qlab-bloch-toggle-btn:hover {
+  color: var(--color-text-primary);
+}
+.qlab-bloch-toggle-btn.is-active {
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 .qlab-bloch-reset {
   flex-shrink: 0;
@@ -2072,6 +2124,193 @@
   color: var(--color-text-muted);
   text-align: center;
 }
+
+/* 3D and 2D stage container */
+.qlab-bloch-stage {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  height: 330px;
+  min-height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Three.js 3D Canvas wrapper */
+.qlab-bloch-3d-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: radial-gradient(circle at center, rgba(56, 189, 248, 0.05) 0%, transparent 70%);
+}
+.qlab-bloch-3d-canvas {
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+}
+.qlab-bloch-3d-canvas:active {
+  cursor: grabbing;
+}
+
+/* 3D HUD Camera Controls */
+.qlab-3d-hud-controls {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  z-index: 10;
+}
+.qlab-3d-hud-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  font-size: 0.625rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.qlab-3d-hud-btn:hover {
+  background: rgba(15, 23, 42, 0.9);
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+/* Floating 3D Hover Tooltip */
+.qlab-3d-tooltip {
+  position: absolute;
+  z-index: 30;
+  pointer-events: none;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  color: #f8fafc;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  min-width: 130px;
+}
+.qlab-3d-tooltip-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 3px;
+}
+.qlab-3d-tooltip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.qlab-3d-tooltip-label {
+  font-size: 0.75rem;
+  color: #38bdf8;
+}
+.qlab-3d-tooltip-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.6875rem;
+}
+.qlab-3d-tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.qlab-3d-tooltip-row span {
+  color: #94a3b8;
+}
+.qlab-3d-tooltip-row code {
+  font-family: var(--font-mono);
+  color: #f1f5f9;
+}
+
+/* Phase Color Scale Legend HUD */
+.qlab-phase-legend {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  left: 8px;
+  max-width: 240px;
+  margin-left: auto;
+  z-index: 10;
+  background: rgba(15, 23, 42, 0.78);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+}
+.qlab-phase-legend-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 3px;
+}
+.qlab-phase-legend-title {
+  font-size: 0.625rem;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+}
+.qlab-phase-legend-val {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-bold);
+}
+.qlab-phase-bar-track {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  overflow: visible;
+  margin-bottom: 2px;
+}
+.qlab-phase-bar-gradient {
+  width: 100%;
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(
+    to right,
+    #f43f5e 0%,
+    #eab308 25%,
+    #06b6d4 50%,
+    #8b5cf6 75%,
+    #f43f5e 100%
+  );
+}
+.qlab-phase-indicator {
+  position: absolute;
+  top: -2px;
+  width: 4px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1px solid #ffffff;
+  transform: translateX(-50%);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+.qlab-phase-labels {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.5625rem;
+  color: #64748b;
+}
+
+/* 2D SVG Projection styles */
 .qlab-bloch-svg {
   flex: 1 1 auto;
   min-height: 0;
@@ -2102,6 +2341,7 @@
   flex-shrink: 0;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-1);
   margin-bottom: var(--space-1);
 }
@@ -2130,11 +2370,128 @@
   color: var(--color-primary);
 }
 
+/* Multi-Qubit Overview Panel */
+.qlab-bloch-multi-panel {
+  flex-shrink: 0;
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  padding: var(--space-2) var(--space-3);
+}
+.qlab-bloch-multi-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.qlab-bloch-multi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-2);
+}
+.qlab-bloch-qubit-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--transition-fast);
+}
+.qlab-bloch-qubit-card:hover {
+  border-color: var(--color-primary);
+  background: var(--color-surface);
+  transform: translateY(-1px);
+}
+.qlab-qubit-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+}
+.qlab-qubit-card-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.qlab-qubit-card-stats {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
+}
+.qlab-phase-chip {
+  font-family: var(--font-mono);
+  font-weight: var(--font-weight-semibold);
+}
+.qlab-phase-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Q-Sphere Circuit State Panel */
+.qlab-bloch-qsphere-panel {
+  flex-shrink: 0;
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  padding: var(--space-2) var(--space-3);
+}
+.qlab-qsphere-states-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.qlab-qsphere-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.6875rem;
+}
+.qlab-qsphere-chip-ket {
+  font-family: var(--font-mono);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+.qlab-qsphere-chip-prob {
+  font-family: var(--font-mono);
+  color: var(--color-text-secondary);
+}
+.qlab-qsphere-chip-phase {
+  font-family: var(--font-mono);
+  font-weight: var(--font-weight-semibold);
+}
+.qlab-qsphere-more {
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
+}
+
 /* Educational state panel (coordinates, purity, angles) */
 .qlab-bloch-panel {
   flex-shrink: 0;
   width: 100%;
-  max-width: 310px;
+  max-width: 520px;
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -2165,6 +2522,12 @@
 .qlab-bloch-panel-main {
   font-weight: var(--font-weight-bold);
   color: var(--color-primary);
+}
+.qlab-bloch-panel-phase {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: var(--font-weight-bold);
 }
 .qlab-bloch-badge {
   margin-left: auto;
