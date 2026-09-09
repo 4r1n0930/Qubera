@@ -65,13 +65,8 @@ export function LoginPage() {
       setFormError(error instanceof Error ? error.message : "Something went wrong");
     }
   };
-  const handleGoogleLogin = () => {
-    login();
-    navigate("/dashboard", { replace: true });
-  };
   const handleGithubLogin = () => {
-    login();
-    navigate("/dashboard", { replace: true });
+    authService.githubLogin();
   };
   const handleForgotPassword = () => {
     navigate("/forgot-password");
@@ -95,7 +90,6 @@ export function LoginPage() {
 
         <LoginPanel
           onLogin={handleLogin}
-          onGoogleLogin={handleGoogleLogin}
           onGithubLogin={handleGithubLogin}
           onForgotPassword={handleForgotPassword}
           onCreateAccount={handleCreateAccount}

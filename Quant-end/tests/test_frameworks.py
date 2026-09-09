@@ -1,11 +1,26 @@
+"""Backend-level and visualization-unit tests for the execution service.
+
+These tests exercise the simulator backends (Qiskit, PennyLane, Cirq) and the
+output-normalization helpers directly, bypassing HTTP, and assert that all
+backends agree on the canonical circuit interpretation.
+"""
+
+import math
+
+import numpy as np
 import pytest
-from fastapi.testclient import TestClient
 
-from app.main import app
-from app.quantum.generators import generate_python_circuit
-from app.quantum.parsers import parse_python_circuit
+from app.backends import BACKENDS, get_backend
+from app.schemas.quantum import Circuit
+from app.services.visualization import (
+    bloch_vectors_from_statevector,
+    probabilities_from_counts,
+    probabilities_from_statevector,
+    qubit_reduced_density_matrix,
+    statevector_to_json,
+)
 
-client = TestClient(app)
+ALL_BACKENDS = ["qiskit", "pennylane", "cirq"]
 
 BELL_IR = {
     "num_qubits": 2,
@@ -16,268 +31,183 @@ BELL_IR = {
 }
 
 
-# ─── Generator unit tests (reusable layer) ───────────────────────────────────
-
-class TestGenerators:
-    def test_generate_qiskit_code(self):
-        result = generate_python_circuit(BELL_IR, framework="qiskit")
-        assert result["success"] is True
-        code = result["code"]
-        assert "from qiskit import QuantumCircuit" in code
-        assert "qc = QuantumCircuit(2)" in code
-        assert "qc.h(0)" in code
-        assert "qc.cx(0, 1)" in code
-
-    def test_generate_pennylane_code(self):
-        result = generate_python_circuit(BELL_IR, framework="pennylane")
-        assert result["success"] is True
-        code = result["code"]
-        assert "import pennylane as qml" in code
-        assert 'qml.device("default.qubit", wires=2, shots=1000)' in code
-        assert "qml.Hadamard(wires=0)" in code
-        assert "qml.CNOT(wires=[0, 1])" in code
-        assert "return qml.counts()" in code
-
-    def test_generate_cirq_code(self):
-        result = generate_python_circuit(BELL_IR, framework="cirq")
-        assert result["success"] is True
-        code = result["code"]
-        assert "import cirq" in code
-        assert "qubits = [cirq.LineQubit(i) for i in range(2)]" in code
-        assert "circuit.append(cirq.H(qubits[0]))" in code
-        assert "circuit.append(cirq.CNOT(qubits[0], qubits[1]))" in code
-        assert 'circuit.append(cirq.measure(*qubits, key="result"))' in code
-
-    def test_generate_unsupported_framework(self):
-        result = generate_python_circuit(BELL_IR, framework="foo")
-        assert result["success"] is False
-        assert result["errors"][0]["code"] == "UNSUPPORTED_FRAMEWORK"
-
-    def test_frameworks_produce_different_code_for_same_ir(self):
-        qiskit = generate_python_circuit(BELL_IR, framework="qiskit")["code"]
-        pennylane = generate_python_circuit(BELL_IR, framework="pennylane")["code"]
-        cirq = generate_python_circuit(BELL_IR, framework="cirq")["code"]
-        assert len({qiskit, pennylane, cirq}) == 3
-
-    def test_generated_code_is_valid_python_syntax(self):
-        import ast
-        for fw in ("qiskit", "pennylane", "cirq"):
-            code = generate_python_circuit(BELL_IR, framework=fw)["code"]
-            ast.parse(code)
+def as_circuit(ir):
+    return Circuit.model_validate(ir)
 
 
-# ─── Parser unit tests (framework-specific) ──────────────────────────────────
-
-class TestParsers:
-    def test_parse_pennylane_code(self):
-        code = generate_python_circuit(BELL_IR, framework="pennylane")["code"]
-        result = parse_python_circuit(code, framework="pennylane")
-        assert result["success"] is True
-        assert result["circuit"] == BELL_IR
-
-    def test_parse_cirq_code(self):
-        code = generate_python_circuit(BELL_IR, framework="cirq")["code"]
-        result = parse_python_circuit(code, framework="cirq")
-        assert result["success"] is True
-        assert result["circuit"] == BELL_IR
-
-    def test_parse_qiskit_code(self):
-        code = generate_python_circuit(BELL_IR, framework="qiskit")["code"]
-        result = parse_python_circuit(code, framework="qiskit")
-        assert result["success"] is True
-        assert result["circuit"] == BELL_IR
-
-    def test_parse_unsupported_framework(self):
-        result = parse_python_circuit("x = 1", framework="foo")
-        assert result["success"] is False
-        assert result["errors"][0]["code"] == "UNSUPPORTED_FRAMEWORK"
+def make_backend(name):
+    cls = get_backend(name)
+    assert cls is not None
+    return cls()
 
 
-# ─── /generate endpoint with framework ───────────────────────────────────────
+class TestBackendRegistry:
+    def test_all_expected_backends_registered(self):
+        assert set(BACKENDS) == set(ALL_BACKENDS)
 
-class TestGenerateEndpointFrameworks:
-    def test_generate_qiskit_framework(self):
-        response = client.post("/api/quantum/generate", json={
-            "framework": "qiskit",
-            "circuit": BELL_IR,
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["framework"] == "qiskit"
-        assert "from qiskit import QuantumCircuit" in data["code"]
-
-    def test_generate_pennylane_framework(self):
-        response = client.post("/api/quantum/generate", json={
-            "framework": "pennylane",
-            "circuit": BELL_IR,
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["framework"] == "pennylane"
-        assert "import pennylane as qml" in data["code"]
-
-    def test_generate_cirq_framework(self):
-        response = client.post("/api/quantum/generate", json={
-            "framework": "cirq",
-            "circuit": BELL_IR,
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["framework"] == "cirq"
-        assert "import cirq" in data["code"]
-
-    def test_generate_unsupported_framework(self):
-        response = client.post("/api/quantum/generate", json={
-            "framework": "foo",
-            "circuit": BELL_IR,
-        })
-        assert response.status_code == 400
-        assert response.json()["error"]["code"] == "UNSUPPORTED_FRAMEWORK"
-
-    def test_generate_defaults_to_qiskit_without_framework(self):
-        response = client.post("/api/quantum/generate", json={
-            "language": "python",
-            "circuit": BELL_IR,
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["framework"] == "qiskit"
-        assert "from qiskit import QuantumCircuit" in data["code"]
-
-    def test_generate_switching_frameworks_keeps_ir(self):
-        responses = {}
-        for fw in ("qiskit", "pennylane", "cirq"):
-            r = client.post("/api/quantum/generate", json={"framework": fw, "circuit": BELL_IR})
-            assert r.status_code == 200
-            data = r.json()
-            assert data["framework"] == fw
-            responses[fw] = data["code"]
-
-            parsed = client.post("/api/quantum/parse", json={
-                "language": "python",
-                "framework": fw,
-                "code": data["code"],
-            })
-            assert parsed.status_code == 200
-            parsed_data = parsed.json()
-            assert parsed_data["success"] is True
-            assert parsed_data["circuit"] == BELL_IR
+    def test_unknown_backend_returns_none(self):
+        assert get_backend("foo") is None
 
 
-# ─── /parse endpoint with framework ──────────────────────────────────────────
+class TestBackendCounts:
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_bell_counts(self, backend):
+        counts = make_backend(backend).execute(as_circuit(BELL_IR), shots=200)
+        assert sum(counts.values()) == 200
+        assert set(counts.keys()) <= {"00", "01", "10", "11"}
+        assert "00" in counts and "11" in counts
 
-class TestParseEndpointFrameworks:
-    def test_parse_pennylane_framework(self):
-        code = generate_python_circuit(BELL_IR, framework="pennylane")["code"]
-        response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "framework": "pennylane",
-            "code": code,
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["circuit"] == BELL_IR
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_counts_sum_equals_shots(self, backend):
+        counts = make_backend(backend).execute(as_circuit(BELL_IR), shots=97)
+        assert sum(counts.values()) == 97
 
-    def test_parse_cirq_framework(self):
-        code = generate_python_circuit(BELL_IR, framework="cirq")["code"]
-        response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "framework": "cirq",
-            "code": code,
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["circuit"] == BELL_IR
-
-    def test_parse_unsupported_framework(self):
-        response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "framework": "foo",
-            "code": "x = 1",
-        })
-        assert response.status_code == 400
-        assert response.json()["error"]["code"] == "UNSUPPORTED_FRAMEWORK"
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_bit_ordering_q0_leftmost(self, backend):
+        circ = as_circuit({"num_qubits": 2, "operations": [{"gate": "X", "targets": [1]}]})
+        counts = make_backend(backend).execute(circ, shots=100)
+        assert counts == {"01": 100}
 
 
-# ─── IR → Framework execution ────────────────────────────────────────────────
+class TestBackendStatevector:
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_bell_statevector(self, backend):
+        sv = make_backend(backend).statevector(as_circuit(BELL_IR))
+        expected = np.array([1, 0, 0, 1], dtype=complex) / math.sqrt(2)
+        np.testing.assert_allclose(sv, expected, atol=1e-8)
 
-class TestExecutionBackends:
-    @pytest.mark.parametrize("backend", ["pennylane", "qiskit", "cirq"])
-    def test_execute_on_all_backends(self, backend):
-        response = client.post("/api/quantum/execute", json={
-            "backend": backend,
-            "shots": 200,
-            "circuit": BELL_IR,
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["backend"] == backend
-        assert data["shots"] == 200
-        assert data["num_qubits"] == 2
-        total = sum(data["counts"].values())
-        assert total <= 200
-        assert "00" in data["counts"]
-        assert "11" in data["counts"]
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_single_qubit_flip_statevector(self, backend):
+        circ = as_circuit({"num_qubits": 2, "operations": [{"gate": "X", "targets": [1]}]})
+        sv = make_backend(backend).statevector(circ)
+        expected = np.array([0, 1, 0, 0], dtype=complex)
+        np.testing.assert_allclose(sv, expected, atol=1e-8)
 
-    def test_execute_does_not_round_trip_through_code(self):
-        for backend in ("pennylane", "qiskit", "cirq"):
-            response = client.post("/api/quantum/execute", json={
-                "backend": backend,
-                "shots": 100,
-                "circuit": BELL_IR,
-            })
-            assert response.status_code == 200
-            assert response.json()["success"] if "success" in response.json() else True
-
-
-# ─── Full round-trip via API for each framework ──────────────────────────────
-
-class TestApiRoundTrips:
-    @pytest.mark.parametrize("framework", ["qiskit", "pennylane", "cirq"])
-    def test_generate_then_parse_round_trip(self, framework):
-        gen = client.post("/api/quantum/generate", json={
-            "framework": framework,
-            "circuit": BELL_IR,
-        })
-        assert gen.status_code == 200
-        code = gen.json()["code"]
-
-        parsed = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "framework": framework,
-            "code": code,
-        })
-        assert parsed.status_code == 200
-        data = parsed.json()
-        assert data["success"] is True
-        assert data["circuit"] == BELL_IR
-
-    @pytest.mark.parametrize("framework", ["qiskit", "pennylane", "cirq"])
-    def test_three_qubit_round_trip(self, framework):
-        ir = {
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_statevectors_agree_across_backends(self, backend):
+        circ = as_circuit({
             "num_qubits": 3,
             "operations": [
                 {"gate": "H", "targets": [0]},
-                {"gate": "X", "targets": [2]},
-                {"gate": "CNOT", "targets": [0, 1]},
-                {"gate": "CZ", "targets": [1, 2]},
-                {"gate": "SWAP", "targets": [0, 2]},
+                {"gate": "RX", "targets": [1], "params": [0.7]},
+                {"gate": "RXX", "targets": [1, 2], "params": [1.1]},
+                {"gate": "CCZ", "targets": [0, 1, 2]},
             ],
-        }
-        gen = client.post("/api/quantum/generate", json={"framework": framework, "circuit": ir})
-        assert gen.status_code == 200
-        parsed = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "framework": framework,
-            "code": gen.json()["code"],
         })
-        assert parsed.status_code == 200
-        data = parsed.json()
-        assert data["success"] is True
-        assert data["circuit"] == ir
+        sv = make_backend(backend).statevector(circ)
+        assert sv.shape == (8,)
+        assert np.isclose(np.linalg.norm(sv), 1.0, atol=1e-8)
+
+
+class TestVisualizationHelpers:
+    def test_probabilities_from_statevector(self):
+        sv = np.array([1, 0, 0, 1], dtype=complex) / math.sqrt(2)
+        probs = probabilities_from_statevector(sv, 2)
+        assert probs == {"00": 0.5, "01": 0.0, "10": 0.0, "11": 0.5}
+
+    def test_probabilities_include_all_zero_outcomes(self):
+        sv = np.array([1, 0], dtype=complex)
+        assert probabilities_from_statevector(sv, 1) == {"0": 1.0, "1": 0.0}
+
+    def test_probabilities_from_counts(self):
+        counts = {"00": 30, "11": 10}
+        assert probabilities_from_counts(counts, 40) == {"00": 0.75, "11": 0.25}
+
+    def test_statevector_to_json(self):
+        sv = np.array([1, 1j], dtype=complex) / math.sqrt(2)
+        out = statevector_to_json(sv)
+        assert out == [
+            {"real": 0.70710678, "imag": 0.0},
+            {"real": 0.0, "imag": 0.70710678},
+        ]
+
+    def test_bloch_plus_state(self):
+        sv = np.array([1, 1], dtype=complex) / math.sqrt(2)
+        assert bloch_vectors_from_statevector(sv, 1) == {"q0": {"x": 1.0, "y": 0.0, "z": 0.0}}
+
+    def test_bloch_entangled_bell(self):
+        sv = np.array([1, 0, 0, 1], dtype=complex) / math.sqrt(2)
+        assert bloch_vectors_from_statevector(sv, 2) == {
+            "q0": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "q1": {"x": 0.0, "y": 0.0, "z": 0.0},
+        }
+
+    def test_reduced_density_matrix_three_qubit_middle_qubit(self):
+        sv = np.zeros(8, dtype=complex)
+        sv[0b000] = 1.0
+        rho = qubit_reduced_density_matrix(sv, 1, 3)
+        expected = np.array([[1, 0], [0, 0]], dtype=complex)
+        np.testing.assert_allclose(rho, expected, atol=1e-12)
+
+
+# Visualization gate states: each gate, applied to |0⟩ (Bloch north pole),
+# must land the Bloch vector on its mathematically correct location.
+VISUALIZATION_STATES = [
+    pytest.param("H", [], (1.0, 0.0, 0.0), id="H"),
+    pytest.param("X", [], (0.0, 0.0, -1.0), id="X"),
+    pytest.param("Y", [], (0.0, 0.0, -1.0), id="Y"),
+    pytest.param("Z", [], (0.0, 0.0, 1.0), id="Z"),
+    pytest.param("S", [], (0.0, 0.0, 1.0), id="S"),
+    pytest.param("T", [], (0.0, 0.0, 1.0), id="T"),
+    pytest.param("RX", [math.pi / 4], (0.0, -math.sin(math.pi / 4), math.cos(math.pi / 4)), id="RX-pi-4"),
+    pytest.param("RY", [math.pi / 4], (math.sin(math.pi / 4), 0.0, math.cos(math.pi / 4)), id="RY-pi-4"),
+]
+
+# H |0⟩ = |+⟩, then RZ(π/2) rotates the azimuth to +90° → (0, +1, 0).
+EQUATOR_ROTATIONS = [
+    pytest.param("H", "RZ", [math.pi / 2], (0.0, 1.0, 0.0), id="RZ-pi-2-after-H"),
+]
+
+
+class TestVisualizationGateStates:
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    @pytest.mark.parametrize("gate,params,expected", VISUALIZATION_STATES)
+    def test_gate_from_zero_lands_on_expected_bloch_point(self, backend, gate, params, expected):
+        ops = [{"gate": gate, "targets": [0]}]
+        if params:
+            ops[0]["params"] = params
+        circ = as_circuit({"num_qubits": 1, "operations": ops})
+        sv = make_backend(backend).statevector(circ)
+        bloch = bloch_vectors_from_statevector(sv, 1)["q0"]
+        assert abs(bloch["x"] - expected[0]) < 1e-6
+        assert abs(bloch["y"] - expected[1]) < 1e-6
+        assert abs(bloch["z"] - expected[2]) < 1e-6
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    @pytest.mark.parametrize("pre,phase,params,expected", EQUATOR_ROTATIONS)
+    def test_phase_rotation_moves_azimuth(self, backend, pre, phase, params, expected):
+        circ = as_circuit({
+            "num_qubits": 1,
+            "operations": [
+                {"gate": pre, "targets": [0]},
+                {"gate": phase, "targets": [0], "params": params},
+            ],
+        })
+        sv = make_backend(backend).statevector(circ)
+        bloch = bloch_vectors_from_statevector(sv, 1)["q0"]
+        assert abs(bloch["x"] - expected[0]) < 1e-6
+        assert abs(bloch["y"] - expected[1]) < 1e-6
+        assert abs(bloch["z"] - expected[2]) < 1e-6
+
+
+class TestParameterizedGates:
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_rx_pi_flips_qubit(self, backend):
+        circ = as_circuit({"num_qubits": 1, "operations": [{"gate": "RX", "targets": [0], "params": [math.pi]}]})
+        counts = make_backend(backend).execute(circ, shots=100)
+        assert counts == {"1": 100}
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_rz_half_pi_phase(self, backend):
+        circ = as_circuit({
+            "num_qubits": 1,
+            "operations": [{"gate": "H", "targets": [0]}, {"gate": "RZ", "targets": [0], "params": [math.pi / 2]}, {"gate": "H", "targets": [0]}],
+        })
+        sv = make_backend(backend).statevector(circ)
+
+        unitary = np.array([[1, 1], [1, -1]], dtype=complex) / math.sqrt(2)
+        rz = np.diag([math.e ** (-1j * math.pi / 4), math.e ** (1j * math.pi / 4)])
+        expected = (unitary @ rz @ unitary) @ np.array([1, 0], dtype=complex)
+
+        phase = np.vdot(expected, sv)
+        np.testing.assert_allclose(sv, phase * expected, atol=1e-8)

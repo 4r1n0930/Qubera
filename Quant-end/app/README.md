@@ -5,29 +5,31 @@ Multi-backend quantum execution API built with FastAPI.
 ## Features
 
 - Quantum execution endpoint: `POST /api/quantum/execute`
-- Framework code -> circuit IR parsing: `POST /api/quantum/parse`
-- Circuit IR -> framework code generation: `POST /api/quantum/generate`
 - Frameworks/backends: Qiskit, PennyLane, Cirq
 - Backend-independent Circuit IR as the single source of truth
-- Reusable code-generation layer shared by the editor and any preview/tutorial views
+- Selectable outputs: `counts`, `probabilities`, `statevector`, `bloch_vectors` (all four by default)
 - Consistent bit ordering: `q0 q1 q2 ...` (q0 is the leftmost / most significant bit)
 - Consistent response format regardless of backend
 - Health endpoint: `GET /health`
 - CORS enabled for `http://localhost:5173`
 
+Code generation and parsing are intentionally **out of scope** — the Circuit IR is
+consumed directly by the execution backends. `/api/quantum/generate` and
+`/api/quantum/parse` are gone (they return 404).
+
 ## Architecture
 
 ```text
-                    Circuit IR
-                        │
-         ┌──────────────┴──────────────┐
-         ▼                             ▼
-  Code Generation                  Execution
-         │                             │
-  ┌──────┼─────┐              ┌──────┼─────┐
-  ▼      ▼      ▼              ▼      ▼      ▼
- Qiskit PennyLane Cirq      Qiskit PennyLane Cirq
- Gen.   Gen.    Gen.        Backend Backend  Backend
+                Circuit IR
+                    │
+                    ▼
+        ┌───────────┴───────────┐
+        │                       │
+        ▼                       ▼
+   Qiskit Backend        PennyLane / Cirq
+        │                       │
+        ▼                       ▼
+      Results                 Results
 ```
 
 The Circuit IR is framework-independent. Execution backends consume the Circuit IR
@@ -37,22 +39,22 @@ directly and never depend on generated code or parsing.
 
 ```text
 app/
-└── quantum/
-    ├── circuit_validator.py   # shared Circuit IR validation
-    ├── executor.py            # selects backend and executes Circuit IR
-    ├── base.py                # QuantumBackend ABC
-    ├── generators/            # Circuit IR -> framework Python
-    │   ├── qiskit_generator.py
-    │   ├── pennylane_generator.py
-    │   └── cirq_generator.py
-    ├── parsers/               # framework Python -> Circuit IR (safe AST)
-    │   ├── qiskit_parser.py
-    │   ├── pennylane_parser.py
-    │   └── cirq_parser.py
-    └── backends/              # Circuit IR -> execution results
-        ├── qiskit_backend.py
-        ├── pennylane_backend.py
-        └── cirq_backend.py
+├── main.py                  # FastAPI app, CORS, health, error handlers
+├── exception.py             # APIError (code + message)
+├── routes/
+│   └── quantum.py           # POST /api/quantum/execute
+├── schemas/
+│   └── quantum.py           # ExecuteRequest / ExecuteResponse / Circuit IR
+├── services/
+│   ├── execution.py         # QuantumExecutor: backend selection + response assembly
+│   └── visualization.py     # statevector/probabilities/Bloch vector normalization
+├── backends/
+│   ├── base.py              # QuantumBackend ABC
+│   ├── qiskit_backend.py
+│   ├── pennylane_backend.py
+│   └── cirq_backend.py
+└── utils/
+    └── validation.py        # gate sets, circuit validation, reset detection
 ```
 
 ## Installation
@@ -81,6 +83,7 @@ curl -X POST http://localhost:8000/api/quantum/execute \
 -d '{
   "backend": "qiskit",
   "shots": 1000,
+  "output": ["counts", "probabilities", "statevector", "bloch_vectors"],
   "circuit": {
     "num_qubits": 2,
     "operations": [
@@ -91,72 +94,22 @@ curl -X POST http://localhost:8000/api/quantum/execute \
 }'
 ```
 
-Change `"backend"` to `"pennylane"` or `"cirq"` to use a different backend.
-
-## Example Request: Generate
-
-Generate Qiskit code from the Circuit IR:
-
-```bash
-curl -X POST http://localhost:8000/api/quantum/generate \
--H "Content-Type: application/json" \
--d '{
-  "framework": "qiskit",
-  "circuit": {
-    "num_qubits": 2,
-    "operations": [
-      {"gate": "H", "targets": [0]},
-      {"gate": "CNOT", "targets": [0, 1]}
-    ]
-  }
-}'
-```
-
-Switch to another framework with the same IR:
-
-```bash
-curl -X POST http://localhost:8000/api/quantum/generate \
--H "Content-Type: application/json" \
--d '{
-  "framework": "pennylane",
-  "circuit": {
-    "num_qubits": 2,
-    "operations": [
-      {"gate": "H", "targets": [0]},
-      {"gate": "CNOT", "targets": [0, 1]}
-    ]
-  }
-}'
-```
-
-## Example Request: Parse
-
-Parse Qiskit code back into the Circuit IR:
-
-```bash
-curl -X POST http://localhost:8000/api/quantum/parse \
--H "Content-Type: application/json" \
--d '{
-  "language": "python",
-  "framework": "qiskit",
-  "code": "from qiskit import QuantumCircuit\nqc = QuantumCircuit(2)\nqc.h(0)\nqc.cx(0, 1)"
-}'
-```
-
-## Code <-> Circuit Synchronization
-
-The frontend maintains `currentCircuitIR`, `selectedFramework`, and `generatedCode`.
-Visual changes update the IR and regenerate code via `/generate`. Code changes are
-debounced (~300-500 ms) and parsed back into IR via `/parse`. Run uses the current
-Circuit IR directly with `/execute`.
-
-Do not parse generated code again during Run, and do not feed generated code back into
-the parser immediately after a visual change - the Circuit IR is the canonical state.
+Change `"backend"` to `"pennylane"` or `"cirq"` to use a different backend. When
+`output` is omitted it defaults to `["counts", "probabilities", "statevector",
+"bloch_vectors"]`; only the requested result fields are populated.
 
 ## Supported Gates
 
-Single-qubit: `I`, `X`, `Y`, `Z`, `H`, `S`, `T`
-Two-qubit: `CNOT`, `CZ`, `SWAP`
+- Single-qubit: `I`, `X`, `Y`, `Z`, `H`, `S`, `Sdg`, `T`, `Tdg`
+- Rotations: `RX`, `RY`, `RZ`, `P` (angle in radians)
+- Two-qubit: `CNOT`, `CX` (alias), `CZ`, `SWAP`
+- Two-qubit rotations: `RXX`, `RZZ` (angle in radians)
+- Multi-qubit: `CCX`, `CCZ`
+- Operations: `measure`, `reset`, `barrier`
+
+Note: requesting `statevector` or `bloch_vectors` for a circuit with a mid-circuit
+`reset` returns a `STATEVECTOR_NOT_AVAILABLE` error, because a reset circuit has no
+well-defined pure final state.
 
 ## Bit Ordering
 
@@ -168,10 +121,13 @@ q1 = 0
 q2 = 1
 ```
 
+`q0` is the leftmost / most significant bit. The statevector index `i` corresponds to
+the bitstring `format(i, n)`. Qiskit's native (reversed) ordering is normalized away.
+
 ## Tests
 
 ```bash
-python -m pytest tests -v
+python -m pytest tests -q
 ```
 
 See `API.md` for the full API documentation.

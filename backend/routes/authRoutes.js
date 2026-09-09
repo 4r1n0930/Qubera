@@ -1,5 +1,6 @@
 import express from "express";
 import { OAuth2Client } from "google-auth-library";
+import axios from "axios";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
@@ -213,6 +214,22 @@ router.post("/login", async (req, res) => {
 
 
 // =========================
+// PUBLIC AUTH CONFIG
+// GET /auth/config
+// =========================
+
+router.get("/config", (req, res) => {
+    // Public values only — never expose secrets (client secret stays server-side).
+    res.json({
+        googleClientId: process.env.GOOGLE_CLIENT_ID || null,
+        githubEnabled: Boolean(
+            process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET
+        ),
+    });
+});
+
+
+// =========================
 // GOOGLE LOGIN
 // POST /auth/google
 // =========================
@@ -299,6 +316,403 @@ router.post("/google", async (req, res) => {
         return res.status(500).json({
             message: "Authentication failed",
         });
+    }
+});
+
+
+// =========================
+// GOOGLE OAUTH - INITIATE
+// GET /auth/google
+// =========================
+// Redirect flow (mirrors GitHub). The browser is sent to Google's consent
+// screen; on completion Google redirects to /auth/google/callback which
+// exchanges the code and lands back on the frontend with a token.
+
+router.get("/google", (req, res) => {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+
+    if (!clientId) {
+        return res.status(500).json({
+            message: "Google OAuth is not configured",
+        });
+    }
+
+    const redirectUri =
+        process.env.GOOGLE_CALLBACK_URL ||
+        `${req.protocol}://${req.get("host")}/auth/google/callback`;
+
+    const params = new URLSearchParams({
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        response_type: "code",
+        scope: "openid email profile",
+        access_type: "online",
+        // Ensure we always get a fresh prompt so the user can pick an account.
+        prompt: "select_account",
+    });
+
+    res.redirect(
+        `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
+    );
+});
+
+// =========================
+// GOOGLE OAUTH - CALLBACK
+// GET /auth/google/callback
+// =========================
+
+router.get("/google/callback", async (req, res) => {
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173/dashboard";
+
+    try {
+        const { code, error } = req.query;
+
+        if (error) {
+            // User denied authorization
+            return res.redirect(
+                `${frontendUrl}/auth/callback?error=${encodeURIComponent(
+                    "Google authorization denied."
+                )}`
+            );
+        }
+
+        if (!code) {
+            return res.redirect(
+                `${frontendUrl}/auth/callback?error=${encodeURIComponent(
+                    "Google authorization failed: missing code."
+                )}`
+            );
+        }
+
+        const clientId = process.env.GOOGLE_CLIENT_ID;
+        const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+        if (!clientId || !clientSecret) {
+            return res.redirect(
+                `${frontendUrl}/auth/callback?error=${encodeURIComponent(
+                    "Google OAuth is not configured."
+                )}`
+            );
+        }
+
+        const redirectUri =
+            process.env.GOOGLE_CALLBACK_URL ||
+            `${req.protocol}://${req.get("host")}/auth/google/callback`;
+
+        const oauthClient = new OAuth2Client(clientId, clientSecret, redirectUri);
+
+        // Exchange the authorization code for tokens
+        let tokenResponse;
+        try {
+            const { tokens } = await oauthClient.getToken(code);
+            oauthClient.setCredentials(tokens);
+            tokenResponse = tokens;
+        } catch (err) {
+            console.error("Google token exchange error:", err.message);
+            return res.redirect(
+                `${frontendUrl}/auth/callback?error=${encodeURIComponent(
+                    "Google authentication failed during token exchange."
+                )}`
+            );
+        }
+
+        // Verify the ID token to get the user profile
+        let ticket;
+        try {
+            ticket = await oauthClient.verifyIdToken({
+                idToken: tokenResponse.id_token,
+                audience: clientId,
+            });
+        } catch (err) {
+            console.error("Google ID token verification error:", err.message);
+            return res.redirect(
+                `${frontendUrl}/auth/callback?error=${encodeURIComponent(
+                    "Failed to verify Google identity."
+                )}`
+            );
+        }
+
+        const payload = ticket.getPayload();
+        const { sub, email, name, picture } = payload;
+
+        if (!email) {
+            return res.redirect(
+                `${frontendUrl}/auth/callback?error=${encodeURIComponent(
+                    "Google account has no accessible email."
+                )}`
+            );
+        }
+
+        // Find or create the user (same linking logic as the ID-token flow)
+        let user = await User.findOne({ googleId: sub });
+
+        if (!user) {
+            // Try to link an existing account with the same email
+            user = await User.findOne({ email });
+
+            if (user) {
+                user.googleId = sub;
+                if (!user.profilePhoto && picture) {
+                    user.profilePhoto = picture;
+                }
+                user.isVerified = true;
+                await user.save();
+            } else {
+                user = await User.create({
+                    googleId: sub,
+                    email,
+                    name,
+                    profilePhoto: picture,
+                    isVerified: true,
+                });
+            }
+        }
+
+        const token = generateToken(user);
+
+        return res.redirect(
+            `${frontendUrl}/auth/callback?token=${encodeURIComponent(
+                token
+            )}&user=${encodeURIComponent(
+                JSON.stringify({
+                    id: user._id,
+                    name: user.name,
+                    email: user.email,
+                    profilePhoto: user.profilePhoto,
+                })
+            )}`
+        );
+    } catch (error) {
+        console.error(error);
+        return res.redirect(
+            `${frontendUrl}/auth/callback?error=${encodeURIComponent(
+                "Google authentication failed unexpectedly."
+            )}`
+        );
+    }
+});
+
+
+// =========================
+// GITHUB OAUTH - INITIATE
+// GET /auth/github
+// =========================
+
+router.get("/github", (req, res) => {
+    const clientId = process.env.GITHUB_CLIENT_ID;
+
+    if (!clientId) {
+        return res.status(500).json({
+            message: "GitHub OAuth is not configured",
+        });
+    }
+
+    const redirectUri =
+        process.env.GITHUB_CALLBACK_URL ||
+        `${req.protocol}://${req.get("host")}/auth/github/callback`;
+
+    const params = new URLSearchParams({
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        scope: "user:email",
+    });
+
+    res.redirect(
+        `https://github.com/login/oauth/authorize?${params.toString()}`
+    );
+});
+
+// =========================
+// GITHUB OAUTH - CALLBACK
+// GET /auth/github/callback
+// =========================
+
+router.get("/github/callback", async (req, res) => {
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173/dashboard";
+
+    try {
+        const { code, error } = req.query;
+
+        if (error) {
+            // User denied authorization
+            return res.redirect(
+                `${frontendUrl}/auth/callback?error=${encodeURIComponent(
+                    "GitHub authorization denied."
+                )}`
+            );
+        }
+
+        if (!code) {
+            return res.redirect(
+                `${frontendUrl}/auth/callback?error=${encodeURIComponent(
+                    "GitHub authorization failed: missing code."
+                )}`
+            );
+        }
+
+        const clientId = process.env.GITHUB_CLIENT_ID;
+        const clientSecret = process.env.GITHUB_CLIENT_SECRET;
+
+        if (!clientId || !clientSecret) {
+            return res.redirect(
+                `${frontendUrl}/auth/callback?error=${encodeURIComponent(
+                    "GitHub OAuth is not configured."
+                )}`
+            );
+        }
+
+        console.log("GitHub callback code:", code);
+
+        // Exchange the authorization code for an access token
+        let tokenResponse;
+        try {
+            tokenResponse = await axios.post(
+                "https://github.com/login/oauth/access_token",
+                {
+                    client_id: clientId,
+                    client_secret: clientSecret,
+                    code,
+                },
+                {
+                    headers: {
+                        Accept: "application/json",
+                    },
+                }
+            );
+        } catch (err) {
+            console.error("GitHub token exchange error:", err.message);
+            return res.redirect(
+                `${frontendUrl}/auth/callback?error=${encodeURIComponent(
+                    "GitHub authentication failed during token exchange."
+                )}`
+            );
+        }
+
+        const { access_token, error: tokenError } = tokenResponse.data;
+
+        if (tokenError || !access_token) {
+            console.error("GitHub access token error:", tokenError);
+            return res.redirect(
+                `${frontendUrl}/auth/callback?error=${encodeURIComponent(
+                    "GitHub authentication failed. Invalid authorization code."
+                )}`
+            );
+        }
+
+        // Fetch GitHub user profile
+        let githubUser;
+        try {
+            githubUser = await axios.get(
+                "https://api.github.com/user",
+                {
+                    headers: {
+                        Authorization: `Bearer ${access_token}`,
+                        Accept: "application/vnd.github+json",
+                    },
+                }
+            );
+        } catch (err) {
+            console.error("GitHub profile fetch error:", err.message);
+            return res.redirect(
+                `${frontendUrl}/auth/callback?error=${encodeURIComponent(
+                    "Failed to retrieve GitHub profile."
+                )}`
+            );
+        }
+
+        const userData = githubUser.data;
+
+        // Fetch primary verified email if not public
+        let email = userData.email || null;
+
+        if (!email && userData.email === null) {
+            try {
+                const emailsResponse = await axios.get(
+                    "https://api.github.com/user/emails",
+                    {
+                        headers: {
+                            Authorization: `Bearer ${access_token}`,
+                            Accept: "application/vnd.github+json",
+                        },
+                    }
+                );
+                const emails = emailsResponse.data;
+                const verified = emails.find(
+                    (e) => e.verified && e.primary
+                );
+                email = (verified || emails[0])?.email || null;
+            } catch (err) {
+                console.error(
+                    "GitHub emails fetch error:",
+                    err.message
+                );
+            }
+        }
+
+        if (!email) {
+            return res.redirect(
+                `${frontendUrl}/auth/callback?error=${encodeURIComponent(
+                    "GitHub account has no accessible email. Please sign up with an email or make your GitHub email public."
+                )}`
+            );
+        }
+
+        // Find or create user
+        let user = await User.findOne({
+            githubId: String(userData.id),
+        });
+
+        if (!user) {
+            // Try to link with an existing account using the same email
+            user = await User.findOne({ email });
+
+            if (user) {
+                // Link GitHub account to existing user
+                user.githubId = String(userData.id);
+
+                if (!user.profilePhoto && userData.avatar_url) {
+                    user.profilePhoto = userData.avatar_url;
+                }
+
+                user.isVerified = true;
+
+                await user.save();
+            } else {
+                // Create a new GitHub user
+                user = await User.create({
+                    githubId: String(userData.id),
+                    email,
+                    name:
+                        userData.name ||
+                        userData.login ||
+                        "GitHub User",
+                    profilePhoto: userData.avatar_url,
+                    isVerified: true,
+                });
+            }
+        }
+
+        const token = generateToken(user);
+
+        return res.redirect(
+            `${frontendUrl}/auth/callback?token=${encodeURIComponent(
+                token
+            )}&user=${encodeURIComponent(
+                JSON.stringify({
+                    id: user._id,
+                    name: user.name,
+                    email: user.email,
+                    profilePhoto: user.profilePhoto,
+                })
+            )}`
+        );
+    } catch (error) {
+        console.error(error);
+        return res.redirect(
+            `${frontendUrl}/auth/callback?error=${encodeURIComponent(
+                "GitHub authentication failed unexpectedly."
+            )}`
+        );
     }
 });
 

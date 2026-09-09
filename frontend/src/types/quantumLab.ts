@@ -4,6 +4,20 @@
  * backend engines, and measurement results.
  */
 
+import type {
+  BlochVector,
+  CircuitIR,
+  ComplexAmplitude,
+  QuantumExecutionResponse,
+} from '../api/quantumApi'
+
+export type {
+  BlochVector,
+  CircuitIR,
+  ComplexAmplitude,
+  QuantumExecutionResponse,
+}
+
 export type BackendType = 'qiskit' | 'cirq' | 'pennylane' | 'openqasm'
 
 /**
@@ -88,9 +102,6 @@ export interface CircuitState {
  */
 export type UpdateSource = 'circuit' | 'code' | 'system'
 
-/** Alias: the flat JSON representation of a circuit shared across panels. */
-export type CircuitIR = CircuitState
-
 /**
  * Structured conversion/validation error matching the backend error contract
  * `{ success: false, error: { type, message, line, column } }`.
@@ -104,47 +115,16 @@ export interface CodeError {
 
 export type Operation = GateOperation
 
-/** Complex amplitude coefficient of a statevector component. */
-export interface ComplexAmplitude {
-  re: number
-  im: number
-}
-
-/** Bloch vector coordinates for a single qubit (unit sphere for pure states). */
-export interface BlochVector {
-  x: number
-  y: number
-  z: number
-}
-
 /**
- * Per-qubit state derived from a partial trace of the global statevector.
- * Shared by the probability chart and the Bloch sphere visualization.
+ * Authoritative execution result returned by the Python service (via the Node
+ * gateway). All sample/measurement fields come from the backend untouched.
  */
-export interface QubitState {
-  qubitIndex: number
-  blochVector: BlochVector
-  probability0: number
-  probability1: number
-}
-
-export interface ExecutionResult {
-  backend: BackendType
-  shots: number
-  num_qubits: number
-  probabilities: Record<string, number>
-  counts: Record<string, number>
-  execution_time_ms?: number
-  statevector_summary?: string
-  statevector?: ComplexAmplitude[]
-  qubitStates?: QubitState[]
-  blochAngles?: { theta: number; phi: number }
-}
+export type ExecutionResult = QuantumExecutionResponse
 
 export interface ExecutionState {
   status: 'idle' | 'loading' | 'success' | 'error'
   result?: ExecutionResult
-  error?: string
+  error?: { type: string; message: string }
 }
 
 export const GATE_CATALOG: GateDefinition[] = [

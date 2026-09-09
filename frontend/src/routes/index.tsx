@@ -22,6 +22,7 @@ import { ForgotPassword } from '../pages/ForgotPassword/ForgotPassword'
 import { Signup } from '../pages/Signup/Signup'
 import { VerifyEmail } from '../pages/VerifyEmail/VerifyEmail'
 import { ResetPassword } from '../pages/ResetPassword/ResetPassword'
+import { AuthCallback } from '../pages/AuthCallback/AuthCallback'
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -30,6 +31,7 @@ export const router = createBrowserRouter([
   { path: '/verify-email', element: <VerifyEmail /> },
   { path: '/reset-password', element: <ResetPassword /> },
   { path: '/reset-password/:token', element: <ResetPassword /> },
+  { path: '/auth/callback', element: <AuthCallback /> },
   {
     path: '/',
     element: <PublicLayout />,

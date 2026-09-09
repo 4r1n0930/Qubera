@@ -4,11 +4,9 @@ import { Mail } from 'lucide-react'
 import { AuthShell } from '../../components/auth/AuthShell'
 import { Divider } from '../../components/login/Divider'
 import { SocialLogin } from '../../components/login/SocialLogin'
-import { useAuth } from '../../contexts/AuthContext'
 import { authService } from '../../services/authService'
 
 export function ForgotPassword() {
-  const { login } = useAuth()
   const [email, setEmail] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -79,7 +77,7 @@ export function ForgotPassword() {
       </form>
 
       <div className="mt-6"><Divider /></div>
-      <div className="mt-5"><SocialLogin onGoogleLogin={e=>{e.preventDefault(); login(); window.location.href='/dashboard'}} onGithubLogin={e=>{e.preventDefault(); login(); window.location.href='/dashboard'}} /></div>
+      <div className="mt-5"><SocialLogin onGithubLogin={e=>{e.preventDefault(); authService.githubLogin()}} /></div>
 
       <p className="mt-5 text-center text-[13px] text-inkmuted">Remember your password? <Link to="/login" className="font-medium text-sage hover:text-sage-dark">Log in</Link></p>
     </AuthShell>

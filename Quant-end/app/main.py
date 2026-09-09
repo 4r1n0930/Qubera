@@ -1,21 +1,23 @@
-from fastapi import FastAPI, Request, Response
+"""QUBERA quantum execution service.
+
+Takes canonical Circuit IR, executes/simulates it with a selected backend
+(Qiskit, PennyLane, or Cirq), and returns normalized quantum results
+(counts, probabilities, statevector, bloch_vectors) for QUBERA's
+visualizations.
+
+Code conversion (generation) and code parsing are NOT responsibilities of
+this service; they are handled by the frontend/Node.js architecture.
+"""
+
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.exception import APIError
-from app.quantum.executor import QuantumExecutor
-from app.quantum.generators import generate_python_circuit
-from app.quantum.parsers import parse_python_circuit
-from app.schemas import (
-    ExecuteRequest,
-    ExecuteResponse,
-    ParseRequest,
-    ParseResponse,
-    GenerateRequest,
-    GenerateResponse,
-)
+from app.routes.quantum import router as quantum_router
 
-app = FastAPI(title="Quantum Service API")
+app = FastAPI(title="QUBERA Quantum Execution Service")
 
 app.add_middleware(
     CORSMiddleware,
@@ -25,7 +27,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-executor = QuantumExecutor()
+app.include_router(quantum_router)
 
 
 @app.get("/health")
@@ -33,40 +35,26 @@ def health():
     return {"status": "ok"}
 
 
-@app.post("/api/quantum/execute", response_model=ExecuteResponse)
-def execute(request: ExecuteRequest):
-    try:
-        return executor.execute(request)
-    except ValueError as e:
-        raise APIError(code="INVALID_BACKEND", message=str(e))
-    except Exception as e:
-        raise APIError(code="CIRCUIT_EXECUTION_ERROR", message=str(e))
-
-
-@app.post("/api/quantum/parse", response_model=ParseResponse)
-def parse(request: ParseRequest):
-    try:
-        framework = request.framework or "qiskit"
-        return parse_python_circuit(request.code, framework=framework)
-    except Exception as e:
-        raise APIError(code="PARSE_ERROR", message=str(e))
-
-
-@app.post("/api/quantum/generate", response_model=GenerateResponse)
-def generate(request: GenerateRequest):
-    try:
-        framework = request.framework or "qiskit"
-        result = generate_python_circuit(request.circuit.model_dump(), framework=framework)
-        if result.get("success"):
-            result["framework"] = framework
-        return result
-    except Exception as e:
-        raise APIError(code="GENERATION_ERROR", message=str(e))
-
-
 @app.exception_handler(APIError)
 async def api_error_handler(request: Request, exc: APIError):
     return JSONResponse(
         status_code=400,
-        content={"error": {"code": exc.code, "message": exc.message}},
+        content={
+            "success": False,
+            "error": {"type": exc.code, "message": exc.message},
+        },
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=400,
+        content={
+            "success": False,
+            "error": {
+                "type": "VALIDATION_ERROR",
+                "message": "Invalid request body",
+            },
+        },
     )

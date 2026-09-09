@@ -1,4 +1,7 @@
-const API_BASE = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') || 'http://localhost:5000'
+// Auth endpoints are mounted at /auth on the Node origin (not under /api).
+// Derive the origin from VITE_API_URL (e.g. http://localhost:3000/api -> http://localhost:3000).
+const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') || 'http://localhost:3000/api'
+const API_BASE = API_URL.replace(/\/api$/, '')
 
 type AuthUser = { id: string; name: string; email: string; profilePhoto?: string }
 
@@ -132,6 +135,33 @@ export const authService = {
 
   async googleLogin(credential: string): Promise<ApiResult<{ token: string; user: AuthUser }>> {
     return apiPost('/auth/google', { credential })
+  },
+
+  // Redirect the browser to the backend Google OAuth authorization endpoint.
+  // After the user authenticates, Google redirects to the backend callback,
+  // which redirects back to the frontend /auth/callback route with the token.
+  googleRedirect(origin?: string): void {
+    window.location.href = `${origin || API_BASE}/auth/google`
+  },
+
+  // Public (non-secret) auth configuration. Used by the Google button to resolve
+  // the client ID without leaking the client secret.
+  async getAuthConfig(): Promise<{ googleClientId?: string; githubEnabled?: boolean }> {
+    try {
+      const res = await fetch(`${API_BASE}/auth/config`)
+      if (!res.ok) return {}
+      const json = (await res.json()) as { googleClientId?: string; githubEnabled?: boolean }
+      return json ?? {}
+    } catch {
+      return {}
+    }
+  },
+
+  // Redirect the browser to the backend GitHub OAuth authorization endpoint.
+  // After the user authenticates, GitHub redirects to the backend callback,
+  // which redirects back to the frontend /auth/callback route with the token.
+  githubLogin(origin?: string): void {
+    window.location.href = `${origin || API_BASE}/auth/github`
   },
 
   getPendingEmail(): string | null {

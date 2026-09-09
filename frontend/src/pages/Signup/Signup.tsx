@@ -1,15 +1,15 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, User, Mail } from 'lucide-react'
 import { AuthShell } from '../../components/auth/AuthShell'
 import { Divider } from '../../components/login/Divider'
 import { SocialLogin } from '../../components/login/SocialLogin'
-import { useAuth } from '../../contexts/AuthContext'
 import { authService } from '../../services/authService'
+import { useAuth } from '../../contexts/AuthContext'
 
 export function Signup() {
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const { isAuthenticated } = useAuth()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -51,8 +51,11 @@ export function Signup() {
     navigate('/verify-email', { replace: true })
   }
 
-  const handleGoogle = () => { login(); navigate('/dashboard', { replace:true }) }
-  const handleGithub = () => { login(); navigate('/dashboard', { replace:true }) }
+  const handleGithub = () => { authService.githubLogin() }
+
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />
+  }
 
   return (
     <AuthShell>
@@ -120,7 +123,7 @@ export function Signup() {
       </form>
 
       <div className="mt-6"><Divider /></div>
-      <div className="mt-5"><SocialLogin onGoogleLogin={e=>{e.preventDefault(); handleGoogle()}} onGithubLogin={e=>{e.preventDefault(); handleGithub()}} /></div>
+      <div className="mt-5"><SocialLogin onGithubLogin={e=>{e.preventDefault(); handleGithub()}} /></div>
 
       <p className="mt-6 text-center text-[13px] text-inkmuted">Already have an account? <Link to="/login" className="font-medium text-sage hover:text-sage-dark">Log in</Link></p>
     </AuthShell>

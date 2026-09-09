@@ -1,9 +1,47 @@
+import math
+
 import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
 
 client = TestClient(app)
+
+ALL_BACKENDS = ["qiskit", "pennylane", "cirq"]
+
+ALL_OUTPUTS = ["counts", "probabilities", "statevector", "bloch_vectors"]
+
+BELL_IR = {
+    "num_qubits": 2,
+    "operations": [
+        {"gate": "H", "targets": [0]},
+        {"gate": "CNOT", "targets": [0, 1]},
+    ],
+}
+
+
+def execute(payload):
+    response = client.post("/api/quantum/execute", json=payload)
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def assert_error(payload, code):
+    response = client.post("/api/quantum/execute", json=payload)
+    assert response.status_code == 400, response.text
+    data = response.json()
+    assert data["success"] is False
+    assert data["error"]["type"] == code
+    assert data["error"]["message"]
+
+
+def assert_bell_statevector(statevector):
+    """Bell state (|00> + |11>)/sqrt(2) up to backend floating-point noise."""
+    assert len(statevector) == 4
+    assert statevector[0] == pytest.approx({"real": 0.70710678, "imag": 0.0}, abs=1e-6)
+    assert statevector[1] == pytest.approx({"real": 0.0, "imag": 0.0}, abs=1e-6)
+    assert statevector[2] == pytest.approx({"real": 0.0, "imag": 0.0}, abs=1e-6)
+    assert statevector[3] == pytest.approx({"real": 0.70710678, "imag": 0.0}, abs=1e-6)
 
 
 # ─── Health ───────────────────────────────────────────────────────────────────
@@ -15,617 +53,407 @@ class TestHealth:
         assert response.json() == {"status": "ok"}
 
 
-# ─── Parse Endpoint ──────────────────────────────────────────────────────────
+# ─── Removed endpoints ────────────────────────────────────────────────────────
 
-class TestParseValidGates:
-    def test_parse_h_gate(self):
-        response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "code": "from qiskit import QuantumCircuit\nqc = QuantumCircuit(1)\nqc.h(0)",
-        })
-        assert response.status_code == 200
-        data = response.json()
+class TestRemovedEndpoints:
+    @pytest.mark.parametrize("path", ["/api/quantum/generate", "/api/quantum/parse"])
+    def test_removed_endpoints_return_404(self, path):
+        response = client.post(path, json={})
+        assert response.status_code == 404
+
+
+# ─── Baseline execute behavior ────────────────────────────────────────────────
+
+class TestExecuteBaseline:
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_bell_default_returns_all_outputs(self, backend):
+        data = execute({"backend": backend, "shots": 200, "circuit": BELL_IR})
         assert data["success"] is True
-        assert data["circuit"]["num_qubits"] == 1
-        assert data["circuit"]["operations"] == [{"gate": "H", "targets": [0]}]
-        assert data["errors"] == []
-
-    def test_parse_x_gate(self):
-        response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "code": "from qiskit import QuantumCircuit\nqc = QuantumCircuit(1)\nqc.x(0)",
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["circuit"]["operations"] == [{"gate": "X", "targets": [0]}]
-
-    def test_parse_y_gate(self):
-        response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "code": "from qiskit import QuantumCircuit\nqc = QuantumCircuit(1)\nqc.y(0)",
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["circuit"]["operations"] == [{"gate": "Y", "targets": [0]}]
-
-    def test_parse_z_gate(self):
-        response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "code": "from qiskit import QuantumCircuit\nqc = QuantumCircuit(1)\nqc.z(0)",
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["circuit"]["operations"] == [{"gate": "Z", "targets": [0]}]
-
-    def test_parse_s_gate(self):
-        response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "code": "from qiskit import QuantumCircuit\nqc = QuantumCircuit(1)\nqc.s(0)",
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["circuit"]["operations"] == [{"gate": "S", "targets": [0]}]
-
-    def test_parse_t_gate(self):
-        response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "code": "from qiskit import QuantumCircuit\nqc = QuantumCircuit(1)\nqc.t(0)",
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["circuit"]["operations"] == [{"gate": "T", "targets": [0]}]
-
-    def test_parse_i_gate(self):
-        response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "code": "from qiskit import QuantumCircuit\nqc = QuantumCircuit(1)\nqc.i(0)",
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["circuit"]["operations"] == [{"gate": "I", "targets": [0]}]
-
-    def test_parse_cnot_gate(self):
-        response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "code": "from qiskit import QuantumCircuit\nqc = QuantumCircuit(2)\nqc.cx(0, 1)",
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["circuit"]["operations"] == [{"gate": "CNOT", "targets": [0, 1]}]
-
-    def test_parse_cz_gate(self):
-        response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "code": "from qiskit import QuantumCircuit\nqc = QuantumCircuit(2)\nqc.cz(0, 1)",
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["circuit"]["operations"] == [{"gate": "CZ", "targets": [0, 1]}]
-
-    def test_parse_swap_gate(self):
-        response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "code": "from qiskit import QuantumCircuit\nqc = QuantumCircuit(2)\nqc.swap(0, 1)",
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["circuit"]["operations"] == [{"gate": "SWAP", "targets": [0, 1]}]
-
-    def test_parse_multiple_operations(self):
-        response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "code": (
-                "from qiskit import QuantumCircuit\n"
-                "qc = QuantumCircuit(2)\n"
-                "qc.h(0)\n"
-                "qc.cx(0, 1)"
-            ),
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert len(data["circuit"]["operations"]) == 2
-        assert data["circuit"]["operations"][0] == {"gate": "H", "targets": [0]}
-        assert data["circuit"]["operations"][1] == {"gate": "CNOT", "targets": [0, 1]}
-
-
-class TestParseErrors:
-    def test_parse_invalid_language(self):
-        response = client.post("/api/quantum/parse", json={
-            "language": "javascript",
-            "code": "console.log('hello')",
-        })
-        assert response.status_code == 400
-        data = response.json()
-        assert data["error"]["code"] == "UNSUPPORTED_LANGUAGE"
-
-    def test_parse_invalid_python_syntax(self):
-        response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "code": "def foo(",
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is False
-        assert len(data["errors"]) > 0
-        assert data["errors"][0]["code"] == "PYTHON_SYNTAX_ERROR"
-
-    def test_parse_incomplete_operation(self):
-        response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "code": (
-                "from qiskit import QuantumCircuit\n"
-                "qc = QuantumCircuit(2)\n"
-                "qc.cx(0,"
-            ),
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is False
-        assert data["errors"][0]["code"] == "PYTHON_SYNTAX_ERROR"
-
-    def test_parse_invalid_qubit_index(self):
-        response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "code": (
-                "from qiskit import QuantumCircuit\n"
-                "qc = QuantumCircuit(2)\n"
-                "qc.h(5)"
-            ),
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is False
-        error_codes = [e["code"] for e in data["errors"]]
-        assert "INVALID_QUBIT" in error_codes
-
-    def test_parse_too_many_targets_single_qubit(self):
-        response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "code": (
-                "from qiskit import QuantumCircuit\n"
-                "qc = QuantumCircuit(2)\n"
-                "qc.h(0, 1)"
-            ),
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is False
-        error_codes = [e["code"] for e in data["errors"]]
-        assert "INVALID_GATE_TARGETS" in error_codes
-
-    def test_parse_too_few_targets_two_qubit(self):
-        response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "code": (
-                "from qiskit import QuantumCircuit\n"
-                "qc = QuantumCircuit(2)\n"
-                "qc.cx(0)"
-            ),
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is False
-        error_codes = [e["code"] for e in data["errors"]]
-        assert "INVALID_GATE_TARGETS" in error_codes
-
-    def test_parse_duplicate_targets_two_qubit(self):
-        response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "code": (
-                "from qiskit import QuantumCircuit\n"
-                "qc = QuantumCircuit(2)\n"
-                "qc.cx(0, 0)"
-            ),
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is False
-        error_codes = [e["code"] for e in data["errors"]]
-        assert "INVALID_GATE_TARGETS" in error_codes
-
-    def test_parse_unsupported_gate(self):
-        response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "code": (
-                "from qiskit import QuantumCircuit\n"
-                "qc = QuantumCircuit(2)\n"
-                "qc.foo(0)"
-            ),
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is False
-        error_codes = [e["code"] for e in data["errors"]]
-        assert "INVALID_GATE" in error_codes
-
-    def test_parse_malformed_quantum_circuit_no_args(self):
-        response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "code": (
-                "from qiskit import QuantumCircuit\n"
-                "qc = QuantumCircuit()"
-            ),
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is False
-        error_codes = [e["code"] for e in data["errors"]]
-        assert "INVALID_QUBIT" in error_codes
-
-    def test_parse_malformed_quantum_circuit_negative(self):
-        response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "code": (
-                "from qiskit import QuantumCircuit\n"
-                "qc = QuantumCircuit(-1)"
-            ),
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is False
-        error_codes = [e["code"] for e in data["errors"]]
-        assert "INVALID_QUBIT" in error_codes
-
-    def test_parse_no_quantum_circuit_found(self):
-        response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "code": "x = 5",
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is False
-        assert data["errors"][0]["code"] == "PYTHON_SYNTAX_ERROR"
-
-    def test_parse_arbitrary_python_code_does_not_execute(self):
-        response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "code": "import os; os.system('echo pwned')",
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is False
-        assert data["circuit"] is None
-
-    def test_parse_line_column_info(self):
-        response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "code": (
-                "from qiskit import QuantumCircuit\n"
-                "qc = QuantumCircuit(2)\n"
-                "qc.foo(0)"
-            ),
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is False
-        error = data["errors"][0]
-        assert "line" in error
-        assert "column" in error
-
-
-# ─── Generate Endpoint ───────────────────────────────────────────────────────
-
-class TestGenerateValidGates:
-    def test_generate_h_gate(self):
-        response = client.post("/api/quantum/generate", json={
-            "language": "python",
-            "circuit": {
-                "num_qubits": 1,
-                "operations": [{"gate": "H", "targets": [0]}],
-            },
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert "qc.h(0)" in data["code"]
-        assert "from qiskit import QuantumCircuit" in data["code"]
-        assert "qc = QuantumCircuit(1)" in data["code"]
-
-    def test_generate_x_gate(self):
-        response = client.post("/api/quantum/generate", json={
-            "language": "python",
-            "circuit": {
-                "num_qubits": 1,
-                "operations": [{"gate": "X", "targets": [0]}],
-            },
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert "qc.x(0)" in data["code"]
-
-    def test_generate_cnot_gate(self):
-        response = client.post("/api/quantum/generate", json={
-            "language": "python",
-            "circuit": {
-                "num_qubits": 2,
-                "operations": [{"gate": "CNOT", "targets": [0, 1]}],
-            },
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert "qc.cx(0, 1)" in data["code"]
-
-    def test_generate_cz_gate(self):
-        response = client.post("/api/quantum/generate", json={
-            "language": "python",
-            "circuit": {
-                "num_qubits": 2,
-                "operations": [{"gate": "CZ", "targets": [0, 1]}],
-            },
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert "qc.cz(0, 1)" in data["code"]
-
-    def test_generate_swap_gate(self):
-        response = client.post("/api/quantum/generate", json={
-            "language": "python",
-            "circuit": {
-                "num_qubits": 3,
-                "operations": [{"gate": "SWAP", "targets": [1, 2]}],
-            },
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert "qc.swap(1, 2)" in data["code"]
-
-    def test_generate_multiple_operations(self):
-        response = client.post("/api/quantum/generate", json={
-            "language": "python",
-            "circuit": {
-                "num_qubits": 3,
-                "operations": [
-                    {"gate": "H", "targets": [0]},
-                    {"gate": "X", "targets": [2]},
-                    {"gate": "CNOT", "targets": [0, 1]},
-                    {"gate": "SWAP", "targets": [1, 2]},
-                ],
-            },
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert "qc = QuantumCircuit(3)" in data["code"]
-        assert "qc.h(0)" in data["code"]
-        assert "qc.x(2)" in data["code"]
-        assert "qc.cx(0, 1)" in data["code"]
-        assert "qc.swap(1, 2)" in data["code"]
-
-
-class TestGenerateErrors:
-    def test_generate_invalid_language(self):
-        response = client.post("/api/quantum/generate", json={
-            "language": "javascript",
-            "circuit": {
-                "num_qubits": 1,
-                "operations": [{"gate": "H", "targets": [0]}],
-            },
-        })
-        assert response.status_code == 400
-        data = response.json()
-        assert data["error"]["code"] == "UNSUPPORTED_LANGUAGE"
-
-    def test_generate_zero_qubits(self):
-        response = client.post("/api/quantum/generate", json={
-            "language": "python",
-            "circuit": {
-                "num_qubits": 0,
-                "operations": [],
-            },
-        })
-        assert response.status_code == 400
-        data = response.json()
-        assert data["error"]["code"] == "INVALID_QUBIT"
-
-    def test_generate_negative_qubits(self):
-        response = client.post("/api/quantum/generate", json={
-            "language": "python",
-            "circuit": {
-                "num_qubits": -1,
-                "operations": [],
-            },
-        })
-        assert response.status_code == 400
-        data = response.json()
-        assert data["error"]["code"] == "INVALID_QUBIT"
-
-    def test_generate_invalid_gate(self):
-        response = client.post("/api/quantum/generate", json={
-            "language": "python",
-            "circuit": {
-                "num_qubits": 1,
-                "operations": [{"gate": "FOO", "targets": [0]}],
-            },
-        })
-        assert response.status_code == 400
-        data = response.json()
-        assert data["error"]["code"] == "INVALID_GATE"
-
-    def test_generate_invalid_target_count(self):
-        response = client.post("/api/quantum/generate", json={
-            "language": "python",
-            "circuit": {
-                "num_qubits": 2,
-                "operations": [{"gate": "H", "targets": [0, 1]}],
-            },
-        })
-        assert response.status_code == 400
-        data = response.json()
-        assert data["error"]["code"] == "INVALID_GATE_TARGETS"
-
-    def test_generate_duplicate_targets(self):
-        response = client.post("/api/quantum/generate", json={
-            "language": "python",
-            "circuit": {
-                "num_qubits": 2,
-                "operations": [{"gate": "CNOT", "targets": [0, 0]}],
-            },
-        })
-        assert response.status_code == 400
-        data = response.json()
-        assert data["error"]["code"] == "INVALID_GATE_TARGETS"
-
-    def test_generate_out_of_range_target(self):
-        response = client.post("/api/quantum/generate", json={
-            "language": "python",
-            "circuit": {
-                "num_qubits": 2,
-                "operations": [{"gate": "H", "targets": [5]}],
-            },
-        })
-        assert response.status_code == 400
-        data = response.json()
-        assert data["error"]["code"] == "INVALID_QUBIT"
-
-
-# ─── Round-trip Test ─────────────────────────────────────────────────────────
-
-class TestRoundTrip:
-    def test_generate_then_parse(self):
-        circuit = {
-            "num_qubits": 2,
-            "operations": [
-                {"gate": "H", "targets": [0]},
-                {"gate": "CNOT", "targets": [0, 1]},
-            ],
-        }
-
-        gen_response = client.post("/api/quantum/generate", json={
-            "language": "python",
-            "circuit": circuit,
-        })
-        assert gen_response.status_code == 200
-        gen_data = gen_response.json()
-        assert gen_data["success"] is True
-
-        parse_response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "code": gen_data["code"],
-        })
-        assert parse_response.status_code == 200
-        parse_data = parse_response.json()
-        assert parse_data["success"] is True
-        assert parse_data["circuit"]["num_qubits"] == circuit["num_qubits"]
-        assert parse_data["circuit"]["operations"] == circuit["operations"]
-
-    def test_round_trip_three_qubit_circuit(self):
-        circuit = {
-            "num_qubits": 3,
-            "operations": [
-                {"gate": "H", "targets": [0]},
-                {"gate": "X", "targets": [2]},
-                {"gate": "CNOT", "targets": [0, 1]},
-                {"gate": "SWAP", "targets": [1, 2]},
-            ],
-        }
-
-        gen_response = client.post("/api/quantum/generate", json={
-            "language": "python",
-            "circuit": circuit,
-        })
-        gen_data = gen_response.json()
-        assert gen_data["success"] is True
-
-        parse_response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "code": gen_data["code"],
-        })
-        parse_data = parse_response.json()
-        assert parse_data["success"] is True
-        assert parse_data["circuit"]["num_qubits"] == circuit["num_qubits"]
-        assert parse_data["circuit"]["operations"] == circuit["operations"]
-
-    def test_round_trip_all_single_qubit_gates(self):
-        circuit = {
-            "num_qubits": 1,
-            "operations": [
-                {"gate": "I", "targets": [0]},
-                {"gate": "X", "targets": [0]},
-                {"gate": "Y", "targets": [0]},
-                {"gate": "Z", "targets": [0]},
-                {"gate": "H", "targets": [0]},
-                {"gate": "S", "targets": [0]},
-                {"gate": "T", "targets": [0]},
-            ],
-        }
-
-        gen_response = client.post("/api/quantum/generate", json={
-            "language": "python",
-            "circuit": circuit,
-        })
-        gen_data = gen_response.json()
-        assert gen_data["success"] is True
-
-        parse_response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "code": gen_data["code"],
-        })
-        parse_data = parse_response.json()
-        assert parse_data["success"] is True
-        assert parse_data["circuit"]["num_qubits"] == circuit["num_qubits"]
-        assert parse_data["circuit"]["operations"] == circuit["operations"]
-
-    def test_round_trip_all_two_qubit_gates(self):
-        circuit = {
-            "num_qubits": 3,
-            "operations": [
-                {"gate": "CNOT", "targets": [0, 1]},
-                {"gate": "CZ", "targets": [1, 2]},
-                {"gate": "SWAP", "targets": [0, 2]},
-            ],
-        }
-
-        gen_response = client.post("/api/quantum/generate", json={
-            "language": "python",
-            "circuit": circuit,
-        })
-        gen_data = gen_response.json()
-        assert gen_data["success"] is True
-
-        parse_response = client.post("/api/quantum/parse", json={
-            "language": "python",
-            "code": gen_data["code"],
-        })
-        parse_data = parse_response.json()
-        assert parse_data["success"] is True
-        assert parse_data["circuit"]["num_qubits"] == circuit["num_qubits"]
-        assert parse_data["circuit"]["operations"] == circuit["operations"]
-
-
-# ─── Existing Execute Endpoint ───────────────────────────────────────────────
-
-class TestExecute:
-    def test_execute_still_works(self):
-        response = client.post("/api/quantum/execute", json={
-            "backend": "pennylane",
-            "shots": 100,
-            "circuit": {
-                "num_qubits": 2,
-                "operations": [
-                    {"gate": "H", "targets": [0]},
-                    {"gate": "CNOT", "targets": [0, 1]},
-                ],
-            },
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["backend"] == "pennylane"
-        assert data["shots"] == 100
+        assert data["backend"] == backend
+        assert data["shots"] == 200
         assert data["num_qubits"] == 2
-        assert "counts" in data
-        assert "probabilities" in data
-        assert "elapsed_time_ms" in data
+        assert data["output"] == ALL_OUTPUTS
+        assert data["probabilities"] == {"00": 0.5, "01": 0.0, "10": 0.0, "11": 0.5}
+        assert "00" in data["counts"] and "11" in data["counts"]
+        assert sum(data["counts"].values()) == 200
+        assert_bell_statevector(data["statevector"])
+        assert data["bloch_vectors"] == {
+            "q0": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "q1": {"x": 0.0, "y": 0.0, "z": 0.0},
+        }
+        assert isinstance(data["elapsed_time_ms"], float)
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_empty_circuit_is_all_zeros(self, backend):
+        data = execute({
+            "backend": backend,
+            "shots": 100,
+            "circuit": {"num_qubits": 2, "operations": []},
+        })
+        assert data["counts"] == {"00": 100}
+        assert data["probabilities"] == {"00": 1.0, "01": 0.0, "10": 0.0, "11": 0.0}
+
+
+# ─── Output selection ─────────────────────────────────────────────────────────
+
+class TestOutputSelection:
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_counts_only(self, backend):
+        data = execute({"backend": backend, "shots": 100, "output": ["counts"], "circuit": BELL_IR})
+        assert data["output"] == ["counts"]
+        assert data["counts"] is not None
+        assert data["probabilities"] is None
+        assert data["statevector"] is None
+        assert data["bloch_vectors"] is None
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_probabilities_only(self, backend):
+        data = execute({
+            "backend": backend,
+            "shots": 100,
+            "output": ["probabilities"],
+            "circuit": BELL_IR,
+        })
+        assert data["output"] == ["probabilities"]
+        assert data["counts"] is None
+        assert data["probabilities"] == {"00": 0.5, "01": 0.0, "10": 0.0, "11": 0.5}
+        assert data["statevector"] is None
+        assert data["bloch_vectors"] is None
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_statevector_only(self, backend):
+        data = execute({
+            "backend": backend,
+            "shots": 100,
+            "output": ["statevector"],
+            "circuit": BELL_IR,
+        })
+        assert data["output"] == ["statevector"]
+        assert data["counts"] is None
+        assert data["probabilities"] is None
+        assert_bell_statevector(data["statevector"])
+        assert data["bloch_vectors"] is None
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_bloch_vectors_only(self, backend):
+        circ = {"num_qubits": 1, "operations": [{"gate": "H", "targets": [0]}]}
+        data = execute({
+            "backend": backend,
+            "shots": 100,
+            "output": ["bloch_vectors"],
+            "circuit": circ,
+        })
+        assert data["output"] == ["bloch_vectors"]
+        assert data["counts"] is None
+        assert data["probabilities"] is None
+        assert data["statevector"] is None
+        assert data["bloch_vectors"] == {"q0": {"x": 1.0, "y": 0.0, "z": 0.0}}
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_all_outputs_together(self, backend):
+        data = execute({
+            "backend": backend,
+            "shots": 200,
+            "output": ALL_OUTPUTS,
+            "circuit": BELL_IR,
+        })
+        assert data["output"] == ALL_OUTPUTS
+        assert data["counts"] is not None
+        assert data["probabilities"] == {"00": 0.5, "01": 0.0, "10": 0.0, "11": 0.5}
+        assert_bell_statevector(data["statevector"])
+        assert data["bloch_vectors"] == {
+            "q0": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "q1": {"x": 0.0, "y": 0.0, "z": 0.0},
+        }
+
+
+# ─── Known states across backends ─────────────────────────────────────────────
+
+class TestKnownStates:
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_x_on_second_qubit_bit_ordering(self, backend):
+        circ = {"num_qubits": 2, "operations": [{"gate": "X", "targets": [1]}]}
+        data = execute({"backend": backend, "shots": 100, "circuit": circ})
+        assert data["counts"] == {"01": 100}
+        assert data["probabilities"] == {"00": 0.0, "01": 1.0, "10": 0.0, "11": 0.0}
+        assert data["statevector"] == [
+            {"real": 0.0, "imag": 0.0},
+            {"real": 1.0, "imag": 0.0},
+            {"real": 0.0, "imag": 0.0},
+            {"real": 0.0, "imag": 0.0},
+        ]
+        assert data["bloch_vectors"]["q1"] == {"x": 0.0, "y": 0.0, "z": -1.0}
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_plus_state_bloch(self, backend):
+        circ = {"num_qubits": 2, "operations": [{"gate": "H", "targets": [0]}]}
+        data = execute({"backend": backend, "shots": 100, "circuit": circ})
+        assert data["bloch_vectors"]["q0"] == {"x": 1.0, "y": 0.0, "z": 0.0}
+        assert data["bloch_vectors"]["q1"] == {"x": 0.0, "y": 0.0, "z": 1.0}
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_minus_state_bloch(self, backend):
+        circ = {
+            "num_qubits": 1,
+            "operations": [{"gate": "X", "targets": [0]}, {"gate": "H", "targets": [0]}],
+        }
+        data = execute({"backend": backend, "shots": 100, "circuit": circ})
+        assert data["bloch_vectors"]["q0"] == {"x": -1.0, "y": 0.0, "z": 0.0}
+        assert set(data["counts"].keys()) == {"0", "1"}
+        assert sum(data["counts"].values()) == 100
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_quarter_x_rotation_maps_zero_to_minus_i(self, backend):
+        # RX(π/2)|0⟩ = |-i⟩ = (|0⟩ − i|1⟩)/√2 → (0, −1, 0) on the Bloch sphere.
+        circ = {"num_qubits": 1, "operations": [{"gate": "RX", "targets": [0], "params": [math.pi / 2]}]}
+        data = execute({"backend": backend, "shots": 100, "circuit": circ})
+        assert data["bloch_vectors"]["q0"] == {"x": 0.0, "y": -1.0, "z": 0.0}
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_quarter_y_rotation_is_plus_state(self, backend):
+        # RY(π/2)|0⟩ = |+⟩ → (+1, 0, 0) on the Bloch sphere.
+        circ = {"num_qubits": 1, "operations": [{"gate": "RY", "targets": [0], "params": [math.pi / 2]}]}
+        data = execute({"backend": backend, "shots": 100, "circuit": circ})
+        assert data["bloch_vectors"]["q0"] == {"x": 1.0, "y": 0.0, "z": 0.0}
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_positive_i_state_is_plus_y(self, backend):
+        # |+i⟩ = S|+⟩ = (|0⟩ + i|1⟩)/√2 → (0, +1, 0) on the Bloch sphere.
+        circ = {
+            "num_qubits": 1,
+            "operations": [{"gate": "H", "targets": [0]}, {"gate": "S", "targets": [0]}],
+        }
+        data = execute({"backend": backend, "shots": 100, "circuit": circ})
+        assert data["bloch_vectors"]["q0"] == {"x": 0.0, "y": 1.0, "z": 0.0}
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_negative_i_state_is_minus_y(self, backend):
+        # |-i⟩ = S†|+⟩ = (|0⟩ − i|1⟩)/√2 → (0, −1, 0) on the Bloch sphere.
+        circ = {
+            "num_qubits": 1,
+            "operations": [{"gate": "H", "targets": [0]}, {"gate": "Sdg", "targets": [0]}],
+        }
+        data = execute({"backend": backend, "shots": 100, "circuit": circ})
+        assert data["bloch_vectors"]["q0"] == {"x": 0.0, "y": -1.0, "z": 0.0}
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_t_gate_on_plus_points_to_y_plus_equator(self, backend):
+        # T|+⟩ = cos(π/8)|0⟩ + e^(iπ/4)sin(π/8)|1⟩ → (cos(π/4), sin(π/4), 0)/√... on equator at φ=45°.
+        circ = {
+            "num_qubits": 1,
+            "operations": [{"gate": "H", "targets": [0]}, {"gate": "T", "targets": [0]}],
+        }
+        data = execute({"backend": backend, "shots": 100, "circuit": circ})
+        vec = data["bloch_vectors"]["q0"]
+        for axis, expected in (("x", 0.70710678), ("y", 0.70710678), ("z", 0.0)):
+            assert vec[axis] == pytest.approx(expected, abs=1e-6)
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_rz_half_pi_on_plus_is_plus_y(self, backend):
+        # RZ(π/2)|+⟩ ∝ |+i⟩ → (0, +1, 0).
+        circ = {
+            "num_qubits": 1,
+            "operations": [{"gate": "H", "targets": [0]}, {"gate": "RZ", "targets": [0], "params": [math.pi / 2]}],
+        }
+        data = execute({"backend": backend, "shots": 100, "circuit": circ})
+        vec = data["bloch_vectors"]["q0"]
+        for axis, expected in (("x", 0.0), ("y", 1.0), ("z", 0.0)):
+            assert vec[axis] == pytest.approx(expected, abs=1e-6)
+
+
+# ─── Mid-circuit reset ────────────────────────────────────────────────────────
+
+class TestReset:
+    RESET_IR = {
+        "num_qubits": 2,
+        "operations": [
+            {"gate": "X", "targets": [0]},
+            {"gate": "reset", "targets": [0]},
+            {"gate": "CNOT", "targets": [0, 1]},
+        ],
+    }
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_reset_counts_and_probabilities(self, backend):
+        data = execute({
+            "backend": backend,
+            "shots": 100,
+            "output": ["counts", "probabilities"],
+            "circuit": self.RESET_IR,
+        })
+        assert data["output"] == ["counts", "probabilities"]
+        assert data["counts"] == {"00": 100}
+        assert data["probabilities"] == {"00": 1.0}
+        assert data["statevector"] is None
+        assert data["bloch_vectors"] is None
+
+    @pytest.mark.parametrize("output", [["statevector"], ["bloch_vectors"], ["statevector", "bloch_vectors"]])
+    def test_statevector_from_reset_is_rejected(self, output):
+        assert_error(
+            {
+                "backend": "qiskit",
+                "shots": 100,
+                "output": output,
+                "circuit": self.RESET_IR,
+            },
+            "STATEVECTOR_NOT_AVAILABLE",
+        )
+
+    def test_reset_with_default_outputs_is_rejected(self):
+        assert_error(
+            {"backend": "qiskit", "shots": 100, "circuit": self.RESET_IR},
+            "STATEVECTOR_NOT_AVAILABLE",
+        )
+
+
+# ─── Cross-backend consistency ────────────────────────────────────────────────
+
+class TestCrossBackendConsistency:
+    def test_bell_agreement_across_backends(self):
+        results = {}
+        for backend in ALL_BACKENDS:
+            data = execute({"backend": backend, "shots": 500, "circuit": BELL_IR})
+            results[backend] = data
+            assert data["probabilities"] == {"00": 0.5, "01": 0.0, "10": 0.0, "11": 0.5}
+
+        ref = results[ALL_BACKENDS[0]]
+        for backend in ALL_BACKENDS[1:]:
+            other = results[backend]
+            for index, comp in enumerate(ref["statevector"]):
+                assert other["statevector"][index] == pytest.approx(comp, abs=1e-6)
+            for qubit in ("q0", "q1"):
+                for axis in ("x", "y", "z"):
+                    assert other["bloch_vectors"][qubit][axis] == pytest.approx(
+                        ref["bloch_vectors"][qubit][axis], abs=1e-6
+                    )
+
+    def test_rx_pi_equals_x_across_backends(self):
+        via_rotation = execute({
+            "backend": "qiskit",
+            "shots": 100,
+            "circuit": {"num_qubits": 1, "operations": [{"gate": "RX", "targets": [0], "params": [math.pi]}]},
+        })["counts"]
+        direct = {}
+        for backend in ALL_BACKENDS:
+            direct[backend] = execute({
+                "backend": backend,
+                "shots": 100,
+                "circuit": {"num_qubits": 1, "operations": [{"gate": "X", "targets": [0]}]},
+            })["counts"]
+            assert direct[backend] == {"1": 100}
+        assert via_rotation == {"1": 100}
+
+
+# ─── Request validation errors ────────────────────────────────────────────────
+
+class TestValidationErrors:
+    GOOD_CIRCUIT = {"num_qubits": 1, "operations": [{"gate": "H", "targets": [0]}]}
+
+    def test_invalid_backend(self):
+        assert_error({"backend": "foo", "shots": 10, "circuit": self.GOOD_CIRCUIT}, "INVALID_BACKEND")
+
+    @pytest.mark.parametrize("shots", [0, -1, 100001])
+    def test_invalid_shots(self, shots):
+        assert_error({"backend": "qiskit", "shots": shots, "circuit": self.GOOD_CIRCUIT}, "INVALID_SHOTS")
+
+    @pytest.mark.parametrize("output", [[], ["foo"], ["counts", "blah"]])
+    def test_invalid_output(self, output):
+        assert_error(
+            {"backend": "qiskit", "shots": 10, "output": output, "circuit": self.GOOD_CIRCUIT},
+            "INVALID_OUTPUT",
+        )
+
+    def test_zero_qubits(self):
+        assert_error(
+            {"backend": "qiskit", "shots": 10, "circuit": {"num_qubits": 0, "operations": []}},
+            "INVALID_QUBIT",
+        )
+
+    def test_unknown_gate(self):
+        assert_error(
+            {
+                "backend": "qiskit",
+                "shots": 10,
+                "circuit": {"num_qubits": 1, "operations": [{"gate": "FOO", "targets": [0]}]},
+            },
+            "INVALID_GATE",
+        )
+
+    def test_wrong_target_count_single_qubit(self):
+        assert_error(
+            {
+                "backend": "qiskit",
+                "shots": 10,
+                "circuit": {"num_qubits": 2, "operations": [{"gate": "H", "targets": [0, 1]}]},
+            },
+            "INVALID_GATE_TARGETS",
+        )
+
+    def test_duplicate_targets_two_qubit(self):
+        assert_error(
+            {
+                "backend": "qiskit",
+                "shots": 10,
+                "circuit": {"num_qubits": 2, "operations": [{"gate": "CNOT", "targets": [0, 0]}]},
+            },
+            "INVALID_GATE_TARGETS",
+        )
+
+    def test_missing_rotation_parameter(self):
+        assert_error(
+            {
+                "backend": "qiskit",
+                "shots": 10,
+                "circuit": {"num_qubits": 1, "operations": [{"gate": "RX", "targets": [0]}]},
+            },
+            "INVALID_GATE_PARAMS",
+        )
+
+    def test_out_of_range_target(self):
+        assert_error(
+            {
+                "backend": "qiskit",
+                "shots": 10,
+                "circuit": {"num_qubits": 1, "operations": [{"gate": "H", "targets": [5]}]},
+            },
+            "INVALID_QUBIT",
+        )
+
+    def test_missing_required_field_is_validation_error(self):
+        assert_error({"backend": "qiskit", "shots": 10}, "VALIDATION_ERROR")
+        assert_error({"backend": "qiskit", "circuit": self.GOOD_CIRCUIT}, "VALIDATION_ERROR")
+
+
+# ─── Unsupported gates must fail before the backend runs ─────────────────────
+
+class TestGateCoverage:
+    ALL_GATES_EXAMPLE = {
+        "num_qubits": 3,
+        "operations": [
+            {"gate": "I", "targets": [0]},
+            {"gate": "X", "targets": [1]},
+            {"gate": "Y", "targets": [1]},
+            {"gate": "Z", "targets": [1]},
+            {"gate": "H", "targets": [2]},
+            {"gate": "S", "targets": [2]},
+            {"gate": "Sdg", "targets": [2]},
+            {"gate": "T", "targets": [2]},
+            {"gate": "Tdg", "targets": [2]},
+            {"gate": "CNOT", "targets": [1, 2]},
+            {"gate": "CZ", "targets": [1, 2]},
+            {"gate": "SWAP", "targets": [1, 2]},
+            {"gate": "barrier", "targets": [0, 1, 2]},
+            {"gate": "CCX", "targets": [0, 1, 2]},
+            {"gate": "CCZ", "targets": [0, 1, 2]},
+        ],
+    }
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_broad_gate_set_runs_on_all_backends(self, backend):
+        data = execute({
+            "backend": backend,
+            "shots": 100,
+            "circuit": self.ALL_GATES_EXAMPLE,
+        })
+        assert sum(data["counts"].values()) == 100
+        assert sum(data["probabilities"].values()) == pytest.approx(1.0)
