@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
+import { useLocation } from 'react-router-dom'
 import { CircuitBoard, Code2, SplitSquareHorizontal } from 'lucide-react'
 import type {
   CircuitState,
@@ -144,7 +145,11 @@ function removeGate(circuit: CircuitState, gateId: string): CircuitState {
 }
 
 export function QuantumLab() {
-  const [mode, setMode] = useState<LabMode>('circuit')
+  const location = useLocation()
+  const routeCodeState = location.state as { code?: string; framework?: Framework } | null
+  const seededCode = routeCodeState?.code
+
+  const [mode, setMode] = useState<LabMode>(seededCode ? 'split' : 'circuit')
   const [circuit, setCircuit] = useState<CircuitState>(createInitialCircuit)
   const circuitRef = useRef(circuit)
   const latestCircuit = useCallback((c: CircuitState) => {
@@ -164,7 +169,7 @@ export function QuantumLab() {
   const runVersion = useRef(0)
 
   // ---------------- Code ↔ circuit synchronization ----------------
-  const [framework, setFramework] = useState<Framework>('qiskit')
+  const [framework, setFramework] = useState<Framework>(routeCodeState?.framework ?? 'qiskit')
   // Latest-value ref (synced in an effect) so the stable `runCodeParse`
   // callback reads the current framework at call time, never a stale closure.
   const frameworkRef = useRef<Framework>(framework)
@@ -172,7 +177,9 @@ export function QuantumLab() {
     frameworkRef.current = framework
   }, [framework])
   const [code, setCode] = useState<string>(
-    () => generateCircuitCode({ num_qubits: 1, operations: [] }, 'qiskit').code
+    () =>
+      seededCode ??
+      generateCircuitCode({ num_qubits: 1, operations: [] }, 'qiskit').code
   )
   const [codeStatus, setCodeStatus] = useState<'synced' | 'parsing' | 'error'>('synced')
   const [codeError, setCodeError] = useState<CodeError | null>(null)
@@ -186,8 +193,8 @@ export function QuantumLab() {
    *    editor, so the Monaco onChange echo of our own write is ignored and
    *    never fed back into the debounced parse.
    */
-  const circuitSourceRef = useRef<UpdateSource>('circuit')
-  const programmaticCodeRef = useRef<string>('')
+  const circuitSourceRef = useRef<UpdateSource>(seededCode ? 'code' : 'circuit')
+  const programmaticCodeRef = useRef<string>(seededCode ?? '')
 
   // Debounced parse state: abort in-flight requests and ignore stale results.
   const parseControllerRef = useRef<AbortController | null>(null)
@@ -266,6 +273,15 @@ export function QuantumLab() {
   )
 
   const scheduleCodeParse = useDebouncedCallback(runCodeParse, CODE_EDIT_DEBOUNCE_MS)
+
+  // Code seeded from the Learn page ("Run in Quantum Lab"): sync it into the
+  // circuit model once on mount. The refs above keep the sync loop from
+  // overwriting the seeded code.
+  useEffect(() => {
+    if (!seededCode) return
+    const id = window.setTimeout(() => runCodeParse(seededCode), 0)
+    return () => window.clearTimeout(id)
+  }, [seededCode, runCodeParse])
 
   /**
    * Editor onChange. Ignores the programmatic echo of our own generated code

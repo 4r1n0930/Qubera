@@ -2,7 +2,7 @@ import { createBrowserRouter } from 'react-router-dom'
 import { PublicLayout } from '../layouts/PublicLayout'
 import { DashboardLayout } from '../layouts/DashboardLayout'
 import { LoginPage } from '../pages/LoginPage'
-import { Home } from '../pages/Home/Home'
+import { HomeRedirect } from '../pages/Home/HomeRedirect'
 import { Dashboard } from '../pages/Dashboard/Dashboard'
 import { Learn } from '../pages/Learn/Learn'
 import { QuantumLab } from '../pages/QuantumLab/QuantumLab'
@@ -36,7 +36,7 @@ export const router = createBrowserRouter([
     path: '/',
     element: <PublicLayout />,
     children: [
-      { index: true, element: <Home /> },
+      { index: true, element: <HomeRedirect /> },
       { path: 'learn', element: <Learn /> },
       { path: 'lab', element: <QuantumLabPage /> },
       { path: 'progress', element: <Progress /> },
