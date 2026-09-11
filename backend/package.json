@@ -1,6 +1,7 @@
 {
   "type": "module",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
@@ -8,6 +9,10 @@
     "google-auth-library": "^11.0.2",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.9.4",
-    "nodemailer": "^9.0.5"
+    "nodemailer": "^9.0.5",
+    "zod": "^4.5.4"
+  },
+  "scripts": {
+    "mcp": "node mcp-server/server.js"
   }
 }

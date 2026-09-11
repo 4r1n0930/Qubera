@@ -1,0 +1,429 @@
+# CircuitService.js Documentation
+
+## 1. Overview
+
+`circuitService.js` Quantum Learning Platform ke MCP server ka ek service layer hai.
+
+Iska main purpose quantum circuits ko **create, modify, retrieve aur delete** karna hai.
+
+Ye service circuits ko temporarily memory me store karne ke liye JavaScript ke `Map` data structure ka use karti hai.
+
+### Main responsibilities
+
+* New quantum circuit create karna
+* Circuit me quantum gates add karna
+* Specific gate remove karna
+* Circuit ke saare gates clear karna
+* Complete circuit delete karna
+* Current circuit retrieve karna
+
+---
+
+## 2. Circuit Storage
+
+Service ke constructor me:
+
+```js
+this.circuits = new Map();
+```
+
+use kiya gaya hai.
+
+`Map` me circuit ko uske `circuitId` ke against store kiya jata hai.
+
+Conceptually:
+
+```text
+circuitId → circuit object
+```
+
+Example:
+
+```text
+"default" → {
+  circuitId: "default",
+  qubits: 3,
+  gates: [...]
+}
+```
+
+Isse `circuitId` ke through kisi bhi circuit ko quickly retrieve kiya ja sakta hai.
+
+> Note: Ye currently in-memory storage hai. Server restart hone par stored circuits remove ho jayenge.
+
+---
+
+## 3. `createCircuit()`
+
+### Purpose
+
+Ek naya quantum circuit create karta hai.
+
+### Function
+
+```js
+createCircuit(circuitId, qubits = 3)
+```
+
+### Parameters
+
+| Parameter   | Description                              |
+| ----------- | ---------------------------------------- |
+| `circuitId` | Circuit ki unique ID                     |
+| `qubits`    | Circuit me qubits ki number; default `3` |
+
+### Working
+
+Sabse pehle check hota hai ki given `circuitId` ka circuit already exist karta hai ya nahi.
+
+Agar exist karta hai, toh existing circuit return hota hai.
+
+Agar exist nahi karta, toh naya circuit create hota hai:
+
+```js
+const circuit = {
+  circuitId,
+  qubits,
+  gates: []
+};
+```
+
+Aur `Map` me store kar diya jata hai.
+
+---
+
+## 4. `addGate()`
+
+### Purpose
+
+Existing circuit me ek quantum gate add karta hai.
+
+### Function
+
+```js
+addGate(circuitId, gate, qubit, column)
+```
+
+### Parameters
+
+| Parameter   | Description                         |
+| ----------- | ----------------------------------- |
+| `circuitId` | Jis circuit me gate add karna hai   |
+| `gate`      | Gate type, e.g. H, X, Y, Z          |
+| `qubit`     | Jis qubit par gate apply hoga       |
+| `column`    | Circuit builder me gate ki position |
+
+### Working
+
+Pehle circuit ko `circuitId` ke through find kiya jata hai.
+
+Agar circuit exist nahi karta, toh automatically `createCircuit()` ke through create kiya jata hai.
+
+Uske baad qubit validation hoti hai.
+
+```js
+if (qubit >= circuit.qubits) {
+  throw new Error(
+    `Invalid qubit. Circuit has ${circuit.qubits} qubits.`
+  );
+}
+```
+
+Valid hone par gate object create hota hai:
+
+```js
+const newGate = {
+  gate,
+  qubit,
+  column
+};
+```
+
+Aur circuit ke `gates` array me add kiya jata hai:
+
+```js
+circuit.gates.push(newGate);
+```
+
+Finally updated circuit return hota hai.
+
+### Example
+
+Agar AI `H` gate ko qubit `0` aur column `0` par add karta hai:
+
+```json
+{
+  "gate": "H",
+  "qubit": 0,
+  "column": 0
+}
+```
+
+---
+
+## 5. `removeGate()`
+
+### Purpose
+
+Circuit ke specific qubit aur column par present gate ko remove karta hai.
+
+### Function
+
+```js
+removeGate(circuitId, qubit, column)
+```
+
+### Working
+
+Pehle circuit retrieve kiya jata hai.
+
+Uske baad `findIndex()` ke through matching gate search hota hai:
+
+```js
+const gateIndex = circuit.gates.findIndex(
+  (gate) =>
+    gate.qubit === qubit &&
+    gate.column === column
+);
+```
+
+Agar gate nahi milta, error return hota hai.
+
+Agar gate mil jata hai, toh:
+
+```js
+circuit.gates.splice(gateIndex, 1);
+```
+
+ke through gate remove kar diya jata hai.
+
+Updated circuit return hota hai.
+
+---
+
+## 6. `clearCircuit()`
+
+### Purpose
+
+Circuit ko delete nahi karta, sirf uske andar ke **saare gates remove** karta hai.
+
+### Function
+
+```js
+clearCircuit(circuitId)
+```
+
+### Working
+
+Circuit retrieve karne ke baad:
+
+```js
+circuit.gates = [];
+```
+
+kiya jata hai.
+
+Isse circuit ki qubit configuration same rehti hai, lekin circuit empty ho jata hai.
+
+### Example
+
+Before:
+
+```text
+q0 ── H ─────
+q1 ───── X ──
+q2 ── Z ─────
+```
+
+After:
+
+```text
+q0 ──────────
+q1 ──────────
+q2 ──────────
+```
+
+Circuit exist karta hai, bas gates nahi hain.
+
+---
+
+## 7. `deleteCircuit()`
+
+### Purpose
+
+Complete circuit ko memory se delete karta hai.
+
+### Function
+
+```js
+deleteCircuit(circuitId)
+```
+
+### Working
+
+Pehle circuit existence check hoti hai.
+
+Uske baad:
+
+```js
+this.circuits.delete(circuitId);
+```
+
+ke through circuit ko `Map` se completely remove kar diya jata hai.
+
+Ye `clearCircuit()` se different hai.
+
+### Difference
+
+```text
+clearCircuit()
+→ Circuit remains
+→ Gates removed
+
+deleteCircuit()
+→ Entire circuit removed
+```
+
+---
+
+## 8. `getCircuit()`
+
+### Purpose
+
+Given `circuitId` ka current circuit retrieve karta hai.
+
+### Function
+
+```js
+getCircuit(circuitId)
+```
+
+### Working
+
+```js
+return this.circuits.get(circuitId) || null;
+```
+
+Agar circuit exist karta hai toh circuit object return hota hai.
+
+Agar circuit nahi milta toh `null` return hota hai.
+
+Ye function particularly useful hai kyunki MCP client/AI current circuit ki state verify kar sakta hai.
+
+---
+
+## 9. MCP Server ke saath Relationship
+
+`CircuitService` khud MCP tool nahi hai.
+
+Ye **business logic layer** hai.
+
+MCP server is service ke functions ko tools ke through expose karta hai.
+
+Architecture:
+
+```text
+AI / MCP Client
+       │
+       ▼
+   MCP Server
+       │
+       ├── add_gate
+       ├── remove_gate
+       ├── clear_circuit
+       ├── delete_circuit
+       └── get_circuit
+              │
+              ▼
+       CircuitService
+              │
+              ▼
+        Circuit Map
+```
+
+Example:
+
+```text
+AI requests:
+"Add H gate on qubit 0"
+
+        ↓
+
+MCP add_gate tool
+
+        ↓
+
+circuitService.addGate()
+
+        ↓
+
+circuit.gates.push()
+
+        ↓
+
+Updated circuit returned
+```
+
+---
+
+## 10. Why This Service Layer Is Used
+
+Circuit operations ko directly MCP tool handlers me likhne ke bajay `CircuitService` me rakhne ka advantage ye hai ki **circuit-related logic ek centralized place par maintain hota hai**.
+
+Isse:
+
+* MCP tools simple rehte hain
+* Code reusable hota hai
+* Circuit logic easily test kiya ja sakta hai
+* Future me database add karna easier hota hai
+* Frontend/backend integration ke time same service logic reuse kiya ja sakta hai
+
+---
+
+## 11. Current Limitations
+
+Current implementation intentionally simple hai.
+
+### In-memory storage
+
+```js
+new Map()
+```
+
+use hone ki wajah se server restart hone par circuits lost ho jate hain.
+
+### No persistent database
+
+Currently MongoDB/PostgreSQL jaisa database use nahi ho raha.
+
+### Basic validation
+
+Qubit validation available hai, lekin advanced circuit validation abhi implement nahi ki gayi hai.
+
+### No quantum execution
+
+`CircuitService` ka current purpose **circuit manipulation** hai, quantum circuit simulation ya measurement nahi.
+
+---
+
+## 12. Summary
+
+`circuitService.js` MCP server ke liye quantum circuit management layer provide karta hai.
+
+Its main operations are:
+
+```text
+createCircuit()
+      ↓
+addGate()
+      ↓
+getCircuit()
+      ↓
+removeGate()
+      ↓
+clearCircuit()
+      ↓
+deleteCircuit()
+```
+
+In functions ki help se MCP server AI/MCP clients ko quantum circuit ko modify aur inspect karne ki capabilities provide karta hai.
