@@ -12,6 +12,10 @@
     "google-auth-library": "^11.0.2",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.9.4",
-    "nodemailer": "^9.0.5"
+    "nodemailer": "^9.0.5",
+    "zod": "^4.5.4"
+  },
+  "scripts": {
+    "mcp": "node mcp-server/server.js"
   }
 }

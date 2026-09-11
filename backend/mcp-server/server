@@ -1,0 +1,505 @@
+# server.js — MCP Tools Documentation
+
+## 1. Overview
+
+`server.js` Quantum Learning Platform ke liye **MCP (Model Context Protocol) server** create karta hai.
+
+Is server ka main purpose AI/MCP clients ko quantum circuit operations ke liye tools provide karna hai.
+
+Server currently 5 tools expose karta hai:
+
+1. `add_gate`
+2. `get_circuit`
+3. `remove_gate`
+4. `clear_circuit`
+5. `delete_circuit`
+
+Ye tools internally `CircuitService` ke functions ko call karte hain.
+
+---
+
+## 2. MCP Server Initialization
+
+Server ko `McpServer` class ke through initialize kiya gaya hai:
+
+```js
+const server = new McpServer({
+  name: "quantum-circuit-server",
+  version: "1.0.0",
+});
+```
+
+### Configuration
+
+| Property  | Value                    | Description        |
+| --------- | ------------------------ | ------------------ |
+| `name`    | `quantum-circuit-server` | MCP server ka naam |
+| `version` | `1.0.0`                  | Server version     |
+
+---
+
+# 3. `add_gate`
+
+## Purpose
+
+`add_gate` tool AI/MCP client ko quantum circuit me ek gate add karne ki capability provide karta hai.
+
+### Tool Definition
+
+```js
+server.tool(
+  "add_gate",
+  "Add a quantum gate to a circuit",
+  {
+    circuitId: z.string().default("default"),
+    gate: z.enum(["H", "X", "Y", "Z", "S", "T"]),
+    qubit: z.number().int().min(0),
+    column: z.number().int().min(0),
+  },
+  ...
+);
+```
+
+### Parameters
+
+| Parameter   | Type    | Description                             |
+| ----------- | ------- | --------------------------------------- |
+| `circuitId` | String  | Target circuit ki ID                    |
+| `gate`      | Enum    | Gate type: `H`, `X`, `Y`, `Z`, `S`, `T` |
+| `qubit`     | Integer | Jis qubit par gate add karna hai        |
+| `column`    | Integer | Circuit me gate ki column/position      |
+
+### Example Input
+
+```json
+{
+  "circuitId": "default",
+  "gate": "H",
+  "qubit": 0,
+  "column": 0
+}
+```
+
+### Working
+
+Tool internally:
+
+```js
+circuitService.addGate(
+  circuitId,
+  gate,
+  qubit,
+  column
+);
+```
+
+call karta hai.
+
+`CircuitService` gate ko circuit ke `gates` array me add karta hai.
+
+### Response
+
+Updated circuit JSON format me return hota hai.
+
+```json
+{
+  "circuitId": "default",
+  "qubits": 3,
+  "gates": [
+    {
+      "gate": "H",
+      "qubit": 0,
+      "column": 0
+    }
+  ]
+}
+```
+
+---
+
+# 4. `get_circuit`
+
+## Purpose
+
+`get_circuit` tool current circuit ki state retrieve karta hai.
+
+Ye AI/MCP client ko existing circuit ko inspect karne ki capability deta hai.
+
+### Tool Definition
+
+```js
+server.tool(
+  "get_circuit",
+  "Get the current quantum circuit",
+  {
+    circuitId: z.string(),
+  },
+  ...
+);
+```
+
+### Parameters
+
+| Parameter   | Type   | Description                            |
+| ----------- | ------ | -------------------------------------- |
+| `circuitId` | String | Retrieve kiye jaane wale circuit ki ID |
+
+### Example Input
+
+```json
+{
+  "circuitId": "default"
+}
+```
+
+### Working
+
+Tool:
+
+```js
+circuitService.getCircuit(circuitId);
+```
+
+call karta hai.
+
+Agar circuit exist karta hai, toh uski current state return hoti hai.
+
+Agar circuit nahi milta, error response return hota hai:
+
+```text
+Circuit 'default' not found
+```
+
+### Importance
+
+`get_circuit` se verify kiya ja sakta hai ki previous operations, jaise `add_gate` ya `remove_gate`, circuit state me actually apply hue hain ya nahi.
+
+---
+
+# 5. `remove_gate`
+
+## Purpose
+
+`remove_gate` tool circuit se ek specific gate remove karta hai.
+
+Gate ko identify karne ke liye `qubit` aur `column` use kiye jaate hain.
+
+### Parameters
+
+| Parameter   | Type    | Description          |
+| ----------- | ------- | -------------------- |
+| `circuitId` | String  | Target circuit ki ID |
+| `qubit`     | Integer | Gate ka qubit        |
+| `column`    | Integer | Gate ki column       |
+
+### Example Input
+
+```json
+{
+  "circuitId": "default",
+  "qubit": 0,
+  "column": 0
+}
+```
+
+### Working
+
+Tool internally:
+
+```js
+circuitService.removeGate(
+  circuitId,
+  qubit,
+  column
+);
+```
+
+call karta hai.
+
+`CircuitService` matching qubit aur column par gate find karta hai aur usse remove karta hai.
+
+### Response
+
+Updated circuit return hota hai.
+
+Agar specified position par gate nahi hai, toh error response return hota hai.
+
+---
+
+# 6. `clear_circuit`
+
+## Purpose
+
+`clear_circuit` tool circuit ke andar ke **saare gates remove** karta hai.
+
+Circuit itself delete nahi hota.
+
+### Parameters
+
+| Parameter   | Type   | Description                         |
+| ----------- | ------ | ----------------------------------- |
+| `circuitId` | String | Clear kiye jaane wale circuit ki ID |
+
+### Example Input
+
+```json
+{
+  "circuitId": "default"
+}
+```
+
+### Working
+
+Tool:
+
+```js
+circuitService.clearCircuit(circuitId);
+```
+
+call karta hai.
+
+`CircuitService`:
+
+```js
+circuit.gates = [];
+```
+
+ke through saare gates remove karta hai.
+
+### Difference from `delete_circuit`
+
+```text
+clear_circuit
+→ Circuit remains
+→ All gates removed
+```
+
+Example:
+
+```text
+Before:
+
+q0 ── H ─────
+q1 ───── X ──
+q2 ── Z ─────
+
+After:
+
+q0 ──────────
+q1 ──────────
+q2 ──────────
+```
+
+---
+
+# 7. `delete_circuit`
+
+## Purpose
+
+`delete_circuit` tool complete circuit ko server ki memory se remove karta hai.
+
+### Parameters
+
+| Parameter   | Type   | Description                          |
+| ----------- | ------ | ------------------------------------ |
+| `circuitId` | String | Delete kiye jaane wale circuit ki ID |
+
+### Example Input
+
+```json
+{
+  "circuitId": "default"
+}
+```
+
+### Working
+
+Tool:
+
+```js
+circuitService.deleteCircuit(circuitId);
+```
+
+call karta hai.
+
+`CircuitService` circuit ko `Map` se delete karta hai:
+
+```js
+this.circuits.delete(circuitId);
+```
+
+### Response
+
+Successful deletion par:
+
+```json
+{
+  "message": "Circuit 'default' deleted successfully",
+  "circuitId": "default"
+}
+```
+
+return hota hai.
+
+---
+
+# 8. Error Handling
+
+Sabhi modifying tools (`add_gate`, `remove_gate`, `clear_circuit`, `delete_circuit`) `try/catch` ke through errors handle karte hain.
+
+Example:
+
+```js
+catch (error) {
+  return {
+    content: [
+      {
+        type: "text",
+        text: `Error: ${error.message}`,
+      },
+    ],
+    isError: true,
+  };
+}
+```
+
+Agar operation fail hota hai, MCP client ko `isError: true` ke saath error response milta hai.
+
+Isse client ko pata chal sakta hai ki operation successfully execute nahi hua.
+
+---
+
+# 9. Input Validation
+
+MCP tools ke parameters ko validate karne ke liye **Zod** use kiya gaya hai.
+
+Example:
+
+```js
+gate: z.enum(["H", "X", "Y", "Z", "S", "T"])
+```
+
+Iska matlab sirf supported gates accept honge.
+
+Similarly:
+
+```js
+qubit: z.number().int().min(0)
+```
+
+ensure karta hai ki qubit ek non-negative integer ho.
+
+Input validation invalid requests ko server ke business logic tak pahunchne se pehle reject karne me help karti hai.
+
+---
+
+# 10. MCP Transport
+
+Server `StdioServerTransport` use karta hai:
+
+```js
+const transport = new StdioServerTransport();
+
+await server.connect(transport);
+```
+
+Iska purpose MCP client aur server ke beech communication establish karna hai.
+
+Server tools ko MCP protocol ke through client ke liye available kar deta hai.
+
+---
+
+# 11. CircuitService Integration
+
+`server.js` me actual circuit manipulation logic directly nahi likha gaya hai.
+
+Instead, server `CircuitService` ko use karta hai:
+
+```text
+MCP Tool
+   ↓
+CircuitService
+   ↓
+Circuit Map
+```
+
+Example:
+
+```text
+AI / MCP Client
+       ↓
+    add_gate
+       ↓
+circuitService.addGate()
+       ↓
+   Circuit updated
+```
+
+Is separation se MCP tool layer aur circuit business logic independent rehte hain.
+
+---
+
+# 12. Complete Tool Architecture
+
+Current MCP server architecture:
+
+```text
+                 MCP Client / AI
+                       │
+                       ▼
+              Quantum Circuit MCP
+                    Server
+                       │
+        ┌──────────────┼──────────────┐
+        │              │              │
+        ▼              ▼              ▼
+   add_gate       remove_gate    get_circuit
+        │              │              │
+        └──────────────┼──────────────┘
+                       │
+             ┌─────────┴─────────┐
+             │                   │
+             ▼                   ▼
+       clear_circuit       delete_circuit
+             │                   │
+             └─────────┬─────────┘
+                       ▼
+                CircuitService
+                       │
+                       ▼
+                 Circuit Map
+```
+
+---
+
+# 13. Summary of MCP Tools
+
+| Tool             | Operation                          | Circuit remains? |
+| ---------------- | ---------------------------------- | ---------------- |
+| `add_gate`       | Gate add karta hai                 | Yes              |
+| `remove_gate`    | Specific gate remove karta hai     | Yes              |
+| `get_circuit`    | Current circuit retrieve karta hai | Yes              |
+| `clear_circuit`  | Saare gates remove karta hai       | Yes              |
+| `delete_circuit` | Complete circuit delete karta hai  | No               |
+
+---
+
+# 14. Overall Purpose
+
+`server.js` Quantum Learning Platform ke MCP layer ka entry point hai.
+
+Ye AI/MCP clients ko predefined tools provide karta hai jinke through quantum circuits ko manipulate aur inspect kiya ja sakta hai.
+
+Current implementation ka focus **quantum circuit management** par hai, na ki quantum circuit simulation ya execution par.
+
+The MCP server therefore provides the following capabilities:
+
+```text
+Add Gate
+Remove Gate
+Clear Circuit
+Delete Circuit
+Get Circuit
+```
+
+Ye modular design future me additional circuit operations add karna easy banata hai.
