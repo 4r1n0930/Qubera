@@ -6,6 +6,8 @@ import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
 import moduleRoutes from "./routes/moduleRoutes.js";
 import lessonRoutes from "./routes/lessonRoutes.js";
+import conversionRoutes from "./routes/conversionRoutes.js";
+import quantumRoutes from "./routes/quantumRoutes.js";
 
 dotenv.config();
 
@@ -24,8 +26,10 @@ app.use(express.json());
 app.use("/auth", authRoutes);
 app.use("/api/modules", moduleRoutes);
 app.use("/api/lessons", lessonRoutes);
+app.use("/api/conversion", conversionRoutes);
+app.use("/api", quantumRoutes);
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

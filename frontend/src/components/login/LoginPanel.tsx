@@ -3,7 +3,6 @@ import type { LoginFormValues } from "./LoginForm";
 
 interface LoginPanelProps {
   onLogin: (values: LoginFormValues) => Promise<void>;
-  onGoogleLogin: () => void;
   onGithubLogin: () => void;
   onForgotPassword: () => void;
   onCreateAccount: () => void;
@@ -16,7 +15,6 @@ interface LoginPanelProps {
  */
 export function LoginPanel({
   onLogin,
-  onGoogleLogin,
   onGithubLogin,
   onForgotPassword,
   onCreateAccount,
@@ -29,7 +27,6 @@ export function LoginPanel({
     >
       <LoginCard
         onLogin={onLogin}
-        onGoogleLogin={onGoogleLogin}
         onGithubLogin={onGithubLogin}
         onForgotPassword={onForgotPassword}
         onCreateAccount={onCreateAccount}
