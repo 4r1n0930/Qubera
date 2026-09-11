@@ -17,7 +17,7 @@ export function Home() {
           </p>
           <div className="home-hero-actions">
             <Link to="/login" className="home-cta">Start Learning <span>→</span></Link>
-            <Link to="/quantum-lab" className="home-cta home-cta-outline">Explore Quantum Lab</Link>
+            <Link to="/login" className="home-cta home-cta-outline">Explore Quantum Lab</Link>
           </div>
           <div className="home-features">
             <span className="home-feature"><span className="home-feature-dot"><Check size={12}/></span> Interactive Learning</span>
@@ -99,7 +99,7 @@ export function Home() {
           <div className="home-lab-label">QUANTUM LAB</div>
           <h2>Your quantum<br/>laboratory.</h2>
           <p className="home-lab-desc">Build circuits visually or write quantum code. Run them on powerful simulation backends and explore what happens.</p>
-          <Link to="/quantum-lab" className="home-cta" style={{marginTop:20}}>Open Quantum Lab <span>→</span></Link>
+          <Link to="/login" className="home-cta" style={{marginTop:20}}>Open Quantum Lab <span>→</span></Link>
         </div>
         <div className="home-lab-workspace">
           <div className="home-lab-tabs">
@@ -162,7 +162,7 @@ export function Home() {
           <div className="home-tutor-label">AI QUANTUM TUTOR</div>
           <h2>Your AI tutor,<br/>always by your side.</h2>
           <p className="home-tutor-desc">Ask questions, get explanations, generate code, debug circuits and optimize your quantum experiments.</p>
-          <Link to="/dashboard/ai-tutor" className="home-cta" style={{marginTop:20}}>Try AI Tutor <span>→</span></Link>
+          <Link to="/login" className="home-cta" style={{marginTop:20}}>Try AI Tutor <span>→</span></Link>
         </div>
         <div className="home-tutor-preview">
           <div className="home-tutor-circuit">

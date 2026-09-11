@@ -8,6 +8,7 @@ import type { NavItem } from '../../types/navigation'
 
 const primaryItems: NavItem[] = [
   { label: 'Learn', to: '/learn', icon: 'learn', section: 'primary' },
+  { label: 'Lab', to: '/lab', icon: 'learn', section: 'primary' },
   { label: 'Roadmap', to: '/roadmap', icon: 'roadmap', section: 'primary' },
   { label: 'Playground', to: '/playground', icon: 'playground', section: 'primary' },
   { label: 'Progress', to: '/progress', icon: 'progress', section: 'primary' },

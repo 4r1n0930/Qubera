@@ -10,6 +10,7 @@ import { CodeEditor } from '../pages/CodeEditor/CodeEditor'
 import { Games } from '../pages/Games/Games'
 import { Challenges } from '../pages/Challenges/Challenges'
 import { Progress } from '../pages/Progress/Progress'
+import { QuantumLabPage } from '../pages/QuantumLab/QuantumLabPage'
 import { Leaderboard } from '../pages/Leaderboard/Leaderboard'
 import { AITutor } from '../pages/AITutor/AITutor'
 import { Resources } from '../pages/Resources/Resources'
@@ -17,15 +18,35 @@ import { Profile } from '../pages/Profile/Profile'
 import { SettingsPage } from '../pages/Settings/SettingsPage'
 import { Contact } from '../pages/Contact/Contact'
 import { NotFound } from '../pages/NotFound/NotFound'
+import { ForgotPassword } from '../pages/ForgotPassword/ForgotPassword'
+import { Signup } from '../pages/Signup/Signup'
+import { VerifyEmail } from '../pages/VerifyEmail/VerifyEmail'
+import { ResetPassword } from '../pages/ResetPassword/ResetPassword'
+import { AuthCallback } from '../pages/AuthCallback/AuthCallback'
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
+  { path: '/forgot-password', element: <ForgotPassword /> },
+  { path: '/signup', element: <Signup /> },
+  { path: '/verify-email', element: <VerifyEmail /> },
+  { path: '/reset-password', element: <ResetPassword /> },
+  { path: '/reset-password/:token', element: <ResetPassword /> },
+  { path: '/auth/callback', element: <AuthCallback /> },
   {
     path: '/',
     element: <PublicLayout />,
     children: [
       { index: true, element: <Home /> },
       { path: 'learn', element: <Learn /> },
+      { path: 'lab', element: <QuantumLabPage /> },
+      { path: 'progress', element: <Progress /> },
+      { path: 'login', element: <LoginPage /> },
+      { path: 'forgot-password', element: <ForgotPassword /> },
+      { path: 'signup', element: <Signup /> },
+      { path: 'verify-email', element: <VerifyEmail /> },
+      { path: 'reset-password', element: <ResetPassword /> },
+      { path: 'reset-password/:token', element: <ResetPassword /> },
+      { path: '*', element: <NotFound /> },
       { path: 'quantum-lab', element: <QuantumLab /> },
       { path: 'code-editor', element: <CodeEditor /> },
       { path: 'contact', element: <Contact /> },
@@ -37,7 +58,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Dashboard /> },
       { path: 'learn', element: <Learn /> },
-      { path: 'quantum-lab', element: <QuantumLab /> },
+      { path: 'quantum-lab', element: <QuantumLabPage /> },
       { path: 'code-editor', element: <CodeEditor /> },
       { path: 'games', element: <Games /> },
       { path: 'challenges', element: <Challenges /> },
