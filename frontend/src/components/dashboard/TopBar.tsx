@@ -21,7 +21,7 @@ interface TopBarProps {
 export function TopBar({ onOpenSidebar }: TopBarProps) {
   const navigate = useNavigate()
   const { logout } = useAuth()
-  const { open: openTutor } = useTutorOpen()
+  const { openOverlay } = useTutorOpen()
   const [notifOpen, setNotifOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
 
@@ -71,7 +71,7 @@ export function TopBar({ onOpenSidebar }: TopBarProps) {
           onClick={() => {
             setNotifOpen(false)
             setProfileOpen(false)
-            openTutor()
+            openOverlay()
           }}
         >
           <Sparkles size={19} />
@@ -114,7 +114,7 @@ export function TopBar({ onOpenSidebar }: TopBarProps) {
                 className="dash-dropdown-item"
                 onClick={() => {
                   setNotifOpen(false)
-                  openTutor()
+                  openOverlay()
                 }}
               >
                 <Sparkles size={16} /> AI Tutor replied to you

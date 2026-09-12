@@ -11,7 +11,10 @@ import {
   Sparkles,
 } from 'lucide-react'
 import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
 import ReactMarkdown from 'react-markdown'
+import 'katex/dist/katex.min.css'
 import { useSearchParams } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { LearnCodeBlock } from '../../components/learn/LearnCodeBlock'
@@ -346,7 +349,8 @@ export function Learn() {
 
             <div className="learn-markdown">
               <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
+                remarkPlugins={[remarkGfm, remarkMath]}
+                rehypePlugins={[[rehypeKatex, { throwOnError: false }]]}
                 components={{
                   pre({ children }: { children?: ReactNode }) {
                     return <>{children}</>

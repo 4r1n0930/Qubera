@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useRef, useState } from 'react'
-import { useTutorActions } from './useTutorActions'
+import { useTutorActions, type TutorDispatchResult } from './useTutorActions'
 import { chatTutorApi } from '../services/tutorApi'
 import { getTutorContext } from '../tutor/tutorContextStore'
 import { buildTutorContext } from '../components/tutor/tutorContext'
@@ -36,7 +36,12 @@ export interface TutorChatState {
 
 let messageSeq = 0
 
-export function useTutorChat(): TutorChatState {
+export interface UseTutorChatOptions {
+  /** Fired after a handled `navigate` action so the UI can react (e.g. collapse into companion mode). */
+  onNavigation?: () => void
+}
+
+export function useTutorChat(options?: UseTutorChatOptions) {
   const dispatch = useTutorActions()
   const [messages, setMessages] = useState<TutorMessage[]>([])
   const [isThinking, setIsThinking] = useState(false)
@@ -45,10 +50,8 @@ export function useTutorChat(): TutorChatState {
   const inFlight = useRef(false)
 
   const dispatchActions = useCallback(
-    async (actions: TutorAction[]) => {
-      const results = await dispatch(actions)
-      const unhandled = results.filter((r) => !r.handled)
-      return unhandled.length === 0
+    async (actions: TutorAction[]): Promise<TutorDispatchResult[]> => {
+      return dispatch(actions)
     },
     [dispatch],
   )
@@ -100,7 +103,10 @@ export function useTutorChat(): TutorChatState {
               : m,
           ),
         )
-        await dispatchActions(reply.actions)
+        const results = await dispatchActions(reply.actions)
+        const didNavigate =
+          reply.actions.some((a) => a.type === 'navigate') && results.some((r) => r.handled)
+        if (didNavigate) options?.onNavigation?.()
         setActivity(null)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Tutor service unavailable.')
@@ -112,7 +118,7 @@ export function useTutorChat(): TutorChatState {
         setIsThinking(false)
       }
     },
-    [append, dispatchActions],
+    [append, dispatchActions, options],
   )
 
   const reset = useCallback(() => {

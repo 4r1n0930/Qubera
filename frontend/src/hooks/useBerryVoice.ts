@@ -52,6 +52,51 @@ function finalTranscript(event: RecognitionEventLike): string {
   return text.trim()
 }
 
+/* ------------------------- Text-to-speech helpers ------------------------- */
+/* 
+ * The tutor's replies are markdown. Dictating raw markdown is unreadable
+ * ("double asterisk ... asterisk"), so we reduce it to plain spoken text and
+ * split long replies into sentence-sized utterances that the engine queues.
+ */
+
+function toSpokenText(text: string): string {
+  const withLinks = text.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+  const withCodeLabel = withLinks.replace(/```[\s\S]*?```/g, 'I have included the code in a code block. ')
+  const plain = withCodeLabel
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/[#>*_~|]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return plain
+}
+
+function chunkForSpeech(text: string, maxChars = 380): string[] {
+  const sentences = text.match(/[^.!?]+[.!?]+["')\]]*|\S[^.!?]*$/g) ?? [text]
+  const chunks: string[] = []
+  let buffer = ''
+  for (const sentence of sentences) {
+    if (buffer.length + sentence.length > maxChars && buffer) {
+      chunks.push(buffer.trim())
+      buffer = ''
+    }
+    buffer += sentence
+  }
+  if (buffer.trim()) chunks.push(buffer.trim())
+  return chunks
+}
+
+function pickPreferredVoice(): SpeechSynthesisVoice | null {
+  const voices = window.speechSynthesis.getVoices()
+  if (voices.length === 0) return null
+  return (
+    voices.find(
+      (v) => v.lang?.toLowerCase().startsWith('en') && /google|natural|neural|native/i.test(v.name),
+    ) ??
+    voices.find((v) => v.lang?.toLowerCase().startsWith('en')) ??
+    null
+  )
+}
+
 export type BerryVoiceStatus = 'idle' | 'listening' | 'speaking' | 'unavailable'
 
 export interface BerryVoice {
@@ -69,6 +114,7 @@ export interface BerryVoice {
 export function useBerryVoice(onVoiceResult: (text: string) => void): BerryVoice {
   const [status, setStatus] = useState<BerryVoiceStatus>('idle')
   const recognitionRef = useRef<RecognitionLike | null>(null)
+  const speakTimerRef = useRef<number | null>(null)
   const onResultRef = useRef(onVoiceResult)
 
   useEffect(() => {
@@ -127,25 +173,53 @@ export function useBerryVoice(onVoiceResult: (text: string) => void): BerryVoice
   const speak = useCallback(
     (text: string) => {
       if (!canSpeak || !text) return
+      const spoken = toSpokenText(text)
+      if (!spoken) return
+      const parts = chunkForSpeech(spoken)
+      if (parts.length === 0) return
+
+      const voice = pickPreferredVoice()
+
+      // Chrome commonly swallows a speak() called immediately after cancel(),
+      // so brake for a tick before queuing the new utterance(s).
+      window.speechSynthesis.resume()
       window.speechSynthesis.cancel()
-      const utterance = new SpeechSynthesisUtterance(text)
-      utterance.rate = 1.02
-      utterance.pitch = 1.1
-      utterance.onend = () => setStatus('idle')
-      utterance.onerror = () => setStatus('idle')
+      if (speakTimerRef.current !== null) window.clearTimeout(speakTimerRef.current)
       setStatus('speaking')
-      window.speechSynthesis.speak(utterance)
+      speakTimerRef.current = window.setTimeout(() => {
+        window.speechSynthesis.cancel()
+        parts.forEach((part, index) => {
+          const utterance = new SpeechSynthesisUtterance(part)
+          utterance.rate = 1.02
+          utterance.pitch = 1.1
+          if (voice) utterance.voice = voice
+          const isLast = index === parts.length - 1
+          utterance.onend = () => {
+            if (isLast) setStatus('idle')
+          }
+          utterance.onerror = () => {
+            if (isLast) setStatus('idle')
+          }
+          window.speechSynthesis.speak(utterance)
+        })
+        speakTimerRef.current = null
+      }, 80)
     },
     [canSpeak],
   )
 
   const cancelSpeech = useCallback(() => {
+    if (speakTimerRef.current !== null) {
+      window.clearTimeout(speakTimerRef.current)
+      speakTimerRef.current = null
+    }
     if (canSpeak) window.speechSynthesis.cancel()
     setStatus('idle')
   }, [canSpeak])
 
   useEffect(() => {
     return () => {
+      if (speakTimerRef.current !== null) window.clearTimeout(speakTimerRef.current)
       if (canSpeak) window.speechSynthesis.cancel()
     }
   }, [canSpeak])
