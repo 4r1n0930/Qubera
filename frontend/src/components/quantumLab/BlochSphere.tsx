@@ -30,26 +30,37 @@ interface BlochSphereProps {
 
 const R = 100
 const ANIM_MS = 480
-const DEFAULT_RX = 0.5
-const DEFAULT_RY = 0.6
+const DEFAULT_AZIM = 0.6 // ~34° azimuth around vertical Z axis
+const DEFAULT_ELEV = 0.35 // ~20° elevation tilt above equator
 const LATITUDES = [-60, -30, 30, 60]
 const LONGITUDES = [-90, -45, 0, 45, 90, 135, 180]
 const D2R = Math.PI / 180
 
 type Vec3 = [number, number, number]
 
-function viewOf(x: number, y: number, z: number, rx: number, ry: number): Vec3 {
-  const cy = Math.cos(ry)
-  const sy = Math.sin(ry)
-  const x1 = cy * x + sy * z
-  const y1 = y
-  const z1 = -sy * x + cy * z
-  const cx = Math.cos(rx)
-  const sx = Math.sin(rx)
-  const px = x1
-  const py = cx * y1 - sx * z1
-  const pz = sx * y1 + cx * z1
-  return [px * R, py * R, pz]
+/**
+ * Standard orthographic projection with vertical Z polar axis:
+ *  - Z is vertical (+Z is north pole |0⟩ pointing upwards)
+ *  - Azimuth `azim` rotates around vertical Z axis (yaw)
+ *  - Elevation `elev` tilts viewing plane down from above equator (pitch)
+ */
+function viewOf(x: number, y: number, z: number, azim: number, elev: number): Vec3 {
+  // Step 1: Azimuth rotation around vertical Z axis
+  const ca = Math.cos(azim)
+  const sa = Math.sin(azim)
+  const x1 = ca * x - sa * y
+  const y1 = sa * x + ca * y
+  const z1 = z
+
+  // Step 2: Elevation tilt around horizontal screen axis
+  const ce = Math.cos(elev)
+  const se = Math.sin(elev)
+  const sx = x1
+  // In SVG, screen Y is positive downwards, so +Z (north pole) points upwards (negative sy)
+  const sy = -ce * z1 + se * y1
+  const sz = se * z1 + ce * y1
+
+  return [sx * R, sy * R, sz]
 }
 
 interface PathD {
@@ -57,14 +68,14 @@ interface PathD {
   back: string
 }
 
-function circlePath(pointOf: (t: number) => Vec3, rx: number, ry: number, step = 0.1): PathD {
+function circlePath(pointOf: (t: number) => Vec3, azim: number, elev: number, step = 0.1): PathD {
   let front = ''
   let back = ''
   let frontOn = false
   let backOn = false
   for (let t = 0; t <= Math.PI * 2 + step; t += step) {
     const [x, y, z] = pointOf(t)
-    const [sx, sy, sz] = viewOf(x, y, z, rx, ry)
+    const [sx, sy, sz] = viewOf(x, y, z, azim, elev)
     const p = `${sx.toFixed(2)},${sy.toFixed(2)}`
     if (sz >= 0) {
       front += (frontOn ? ' L' : 'M') + p
@@ -81,22 +92,22 @@ function circlePath(pointOf: (t: number) => Vec3, rx: number, ry: number, step =
 
 const latCircle = (latDeg: number) => (t: number): Vec3 => {
   const lat = latDeg * D2R
-  const rad = R * Math.cos(lat)
-  return [rad * Math.cos(t), rad * Math.sin(t), R * Math.sin(lat)]
+  const rad = Math.cos(lat)
+  return [rad * Math.cos(t), rad * Math.sin(t), Math.sin(lat)]
 }
 
 const lonCircle = (azDeg: number) => (t: number): Vec3 => {
   const az = azDeg * D2R
-  return [R * Math.cos(az) * Math.cos(t), R * Math.sin(az) * Math.cos(t), R * Math.sin(t)]
+  return [Math.cos(az) * Math.cos(t), Math.sin(az) * Math.cos(t), Math.sin(t)]
 }
 
-const equatCircle = (t: number): Vec3 => [R * Math.cos(t), R * Math.sin(t), 0]
+const equatCircle = (t: number): Vec3 => [Math.cos(t), Math.sin(t), 0]
 
-function equatorPolygon(rx: number, ry: number, step = 0.15): string {
+function equatorPolygon(azim: number, elev: number, step = 0.15): string {
   const pts: string[] = []
   for (let t = 0; t <= Math.PI * 2; t += step) {
     const [x, y, z] = equatCircle(t)
-    const [sx, sy] = viewOf(x, y, z, rx, ry)
+    const [sx, sy] = viewOf(x, y, z, azim, elev)
     pts.push(`${sx.toFixed(2)},${sy.toFixed(2)}`)
   }
   return pts.join(' ')
@@ -169,18 +180,18 @@ export function BlochSphere({
   const [viewEngine, setViewEngine] = useState<'3d' | '2d'>('3d')
   const [sphereMode, setSphereMode] = useState<'bloch' | 'qsphere'>('bloch')
 
-  // 2D SVG camera orientation state
-  const [rotX, setRotX] = useState(DEFAULT_RX)
-  const [rotY, setRotY] = useState(DEFAULT_RY)
-  const dragRef = useRef<{ x: number; y: number; rx: number; ry: number } | null>(null)
+  // 2D SVG camera orientation state (azim = horizontal spin around Z, elev = tilt)
+  const [azim, setAzim] = useState(DEFAULT_AZIM)
+  const [elev, setElev] = useState(DEFAULT_ELEV)
+  const dragRef = useRef<{ x: number; y: number; azim: number; elev: number } | null>(null)
 
   // Animated vector for 2D mode
   const pt = useAnimatedVector({ x: info.x, y: info.y, z: info.z })
-  const pointScreen = useMemo<Vec3>(() => viewOf(pt.x, pt.y, pt.z, rotX, rotY), [pt, rotX, rotY])
+  const pointScreen = useMemo<Vec3>(() => viewOf(pt.x, pt.y, pt.z, azim, elev), [pt, azim, elev])
   const pointOnFront = pointScreen[2] >= 0
   const r = Math.sqrt(pt.x * pt.x + pt.y * pt.y + pt.z * pt.z)
   const atCenter = r < 1e-6
-  const [ea, eb] = viewOf(clean(pt.x), clean(pt.y), 0, rotX, rotY)
+  const [ea, eb] = viewOf(clean(pt.x), clean(pt.y), 0, azim, elev)
 
   // 2D Axes & Grids
   const axes: Axis[] = useMemo(() => {
@@ -188,28 +199,28 @@ export function BlochSphere({
     return names.map((name, i) => {
       const vec: Vec3 = [0, 0, 0]
       vec[i] = 1
-      const screen = viewOf(vec[0], vec[1], vec[2], rotX, rotY)
+      const screen = viewOf(vec[0], vec[1], vec[2], azim, elev)
       return { name, vec, screen, front: screen[2] >= 0 }
     })
-  }, [rotX, rotY])
+  }, [azim, elev])
 
   const cardinalMarkers = useMemo(
     () =>
       CARDINAL_POINTS.map((c) => {
-        const screen = viewOf(c.vec[0], c.vec[1], c.vec[2], rotX, rotY)
+        const screen = viewOf(c.vec[0], c.vec[1], c.vec[2], azim, elev)
         return { ...c, screen, front: screen[2] >= 0 }
       }),
-    [rotX, rotY]
+    [azim, elev]
   )
 
   const grids = useMemo(
     () => ({
-      parallels: LATITUDES.map((lat) => circlePath(latCircle(lat), rotX, rotY)),
-      meridians: LONGITUDES.map((az) => circlePath(lonCircle(az), rotX, rotY)),
-      equator: circlePath(equatCircle, rotX, rotY),
-      plane: equatorPolygon(rotX, rotY),
+      parallels: LATITUDES.map((lat) => circlePath(latCircle(lat), azim, elev)),
+      meridians: LONGITUDES.map((az) => circlePath(lonCircle(az), azim, elev)),
+      equator: circlePath(equatCircle, azim, elev),
+      plane: equatorPolygon(azim, elev),
     }),
-    [rotX, rotY]
+    [azim, elev]
   )
 
   // Q-Sphere basis states derived from statevector
@@ -226,17 +237,17 @@ export function BlochSphere({
 
   const handleDown = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
-      dragRef.current = { x: e.clientX, y: e.clientY, rx: rotX, ry: rotY }
+      dragRef.current = { x: e.clientX, y: e.clientY, azim, elev }
       ;(e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId)
     },
-    [rotX, rotY]
+    [azim, elev]
   )
 
   const handleMove = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
     const d = dragRef.current
     if (!d) return
-    setRotX(Math.min(1.4, Math.max(-1.4, d.rx + (e.clientY - d.y) * 0.01)))
-    setRotY(d.ry - (e.clientX - d.x) * 0.01)
+    setAzim(d.azim - (e.clientX - d.x) * 0.01)
+    setElev(Math.min(1.4, Math.max(-1.4, d.elev + (e.clientY - d.y) * 0.01)))
   }, [])
 
   const handleUp = useCallback(() => {
@@ -244,8 +255,8 @@ export function BlochSphere({
   }, [])
 
   const resetView = useCallback(() => {
-    setRotX(DEFAULT_RX)
-    setRotY(DEFAULT_RY)
+    setAzim(DEFAULT_AZIM)
+    setElev(DEFAULT_ELEV)
   }, [])
 
   const tipX = pointScreen[0]
@@ -443,59 +454,137 @@ export function BlochSphere({
               </g>
             ))}
 
-            {/* Equator projection guide */}
-            <g opacity={atCenter ? 0 : 0.5}>
-              <line
-                x1={ea}
-                y1={eb}
-                x2={tipX}
-                y2={tipY}
-                stroke="var(--color-text-muted)"
-                strokeWidth="1"
-                strokeDasharray="2 3"
-              />
-              <circle cx={ea} cy={eb} r="2.2" fill="none" stroke="var(--color-text-muted)" strokeWidth="1" />
-            </g>
-
-            {/* State vector arrow with phase-colored tip */}
-            {!atCenter && (
-              <g className="qlab-bloch-vector">
+            {/* Equator projection guide (for single selected qubit) */}
+            {(selectedQubit !== 'all' || allQubits.length <= 1) && !atCenter && (
+              <g opacity={0.5}>
                 <line
-                  x1="0"
-                  y1="0"
-                  x2={arrowTipX}
-                  y2={arrowTipY}
-                  stroke={phaseColor}
-                  strokeWidth="3.4"
-                  strokeLinecap="round"
-                  opacity={pointOnFront ? 0.95 : 0.55}
+                  x1={ea}
+                  y1={eb}
+                  x2={tipX}
+                  y2={tipY}
+                  stroke="var(--color-text-muted)"
+                  strokeWidth="1"
+                  strokeDasharray="2 3"
                 />
-                <polygon
-                  transform={`translate(${arrowTipX + Math.cos(arrowAngle) * 3}, ${arrowTipY + Math.sin(arrowAngle) * 3}) rotate(${(arrowAngle * 180) / Math.PI})`}
-                  points={`0,0 ${-headSize},${-headSize * 0.55} ${-headSize * 0.4},0 ${-headSize},${headSize * 0.55}`}
-                  fill={phaseColor}
-                  opacity={pointOnFront ? 0.95 : 0.55}
-                />
+                <circle cx={ea} cy={eb} r="2.2" fill="none" stroke="var(--color-text-muted)" strokeWidth="1" />
               </g>
             )}
 
-            {/* State point */}
-            {atCenter ? (
-              <g>
-                <circle cx="0" cy="0" r="4.5" fill="var(--color-text-muted)" stroke="var(--color-border-strong)" strokeWidth="1.5" />
-              </g>
+            {/* State vector arrows (All qubits or single selected qubit) */}
+            {selectedQubit === 'all' && allQubits.length > 1 ? (
+              allQubits.map((q, idx) => {
+                const qCol = QUBIT_PALETTE[idx % QUBIT_PALETTE.length]
+                const [sx, sy, sz] = viewOf(q.x, q.y, q.z, azim, elev)
+                const qLen = Math.sqrt(q.x * q.x + q.y * q.y + q.z * q.z)
+                const qAtCenter = qLen < 1e-6
+                const qAngle = Math.atan2(sy, sx)
+                const onFront = sz >= 0
+
+                if (qAtCenter) {
+                  return (
+                    <g key={idx} onClick={() => onSelectQubit?.(idx)} style={{ cursor: 'pointer' }}>
+                      <circle cx={0} cy={(idx - (allQubits.length - 1) / 2) * 8} r={3.5} fill={qCol} opacity={0.85} />
+                      <text x={8} y={(idx - (allQubits.length - 1) / 2) * 8} dy="0.35em" fill={qCol} fontSize="9">
+                        q{idx}: mixed
+                      </text>
+                    </g>
+                  )
+                }
+
+                return (
+                  <g key={idx} className="qlab-bloch-vector" onClick={() => onSelectQubit?.(idx)} style={{ cursor: 'pointer' }}>
+                    <line
+                      x1={0}
+                      y1={0}
+                      x2={sx}
+                      y2={sy}
+                      stroke={qCol}
+                      strokeWidth={3}
+                      strokeLinecap="round"
+                      opacity={onFront ? 0.95 : 0.55}
+                    />
+                    <polygon
+                      transform={`translate(${sx + Math.cos(qAngle) * 2}, ${sy + Math.sin(qAngle) * 2}) rotate(${(qAngle * 180) / Math.PI})`}
+                      points={`0,0 ${-headSize},${-headSize * 0.55} ${-headSize * 0.4},0 ${-headSize},${headSize * 0.55}`}
+                      fill={qCol}
+                      opacity={onFront ? 0.95 : 0.55}
+                    />
+                    <circle
+                      cx={sx}
+                      cy={sy}
+                      r={onFront ? 6 : 4.5}
+                      fill={qCol}
+                      stroke="#fff"
+                      strokeWidth={1.5}
+                      opacity={onFront ? 1 : 0.6}
+                    />
+                    <text
+                      x={sx + Math.cos(qAngle) * 14}
+                      y={sy + Math.sin(qAngle) * 14}
+                      textAnchor="middle"
+                      dy="0.35em"
+                      fill="#ffffff"
+                      fontSize="10"
+                      fontWeight="bold"
+                    >
+                      q{idx}
+                    </text>
+                  </g>
+                )
+              })
             ) : (
-              <circle
-                cx={tipX}
-                cy={tipY}
-                r={pointOnFront ? 7 : 5.5}
-                fill={phaseColor}
-                stroke="#fff"
-                strokeWidth="2"
-                opacity={pointOnFront ? 1 : 0.55}
-              />
+              <>
+                {!atCenter && (
+                  <g className="qlab-bloch-vector">
+                    <line
+                      x1="0"
+                      y1="0"
+                      x2={arrowTipX}
+                      y2={arrowTipY}
+                      stroke={phaseColor}
+                      strokeWidth="3.4"
+                      strokeLinecap="round"
+                      opacity={pointOnFront ? 0.95 : 0.55}
+                    />
+                    <polygon
+                      transform={`translate(${arrowTipX + Math.cos(arrowAngle) * 3}, ${arrowTipY + Math.sin(arrowAngle) * 3}) rotate(${(arrowAngle * 180) / Math.PI})`}
+                      points={`0,0 ${-headSize},${-headSize * 0.55} ${-headSize * 0.4},0 ${-headSize},${headSize * 0.55}`}
+                      fill={phaseColor}
+                      opacity={pointOnFront ? 0.95 : 0.55}
+                    />
+                  </g>
+                )}
+                {atCenter ? (
+                  <circle cx="0" cy="0" r="4.5" fill="var(--color-text-muted)" stroke="var(--color-border-strong)" strokeWidth="1.5" />
+                ) : (
+                  <circle
+                    cx={tipX}
+                    cy={tipY}
+                    r={pointOnFront ? 7 : 5.5}
+                    fill={phaseColor}
+                    stroke="#fff"
+                    strokeWidth="2"
+                    opacity={pointOnFront ? 1 : 0.55}
+                  />
+                )}
+              </>
             )}
           </svg>
+        )}
+
+        {/* Floating State Badge Overlay (PART 2) */}
+        {sphereMode === 'bloch' && (
+          <div className="qlab-bloch-state-overlay" aria-label="Qubit Bloch vector details">
+            <div className="qlab-bloch-state-overlay-title">
+              {selectedQubit === 'all' ? (allQubits.length > 1 ? 'All Qubits' : 'Qubit 0') : `Qubit ${selectedQubit}`}
+            </div>
+            <div className="qlab-bloch-state-overlay-sub">Bloch Vector</div>
+            <div className="qlab-bloch-state-overlay-coords">
+              <span>x: {formatCoord(info.x, 2)}</span>
+              <span>y: {formatCoord(info.y, 2)}</span>
+              <span>z: {formatCoord(info.z, 2)}</span>
+            </div>
+          </div>
         )}
       </div>
 

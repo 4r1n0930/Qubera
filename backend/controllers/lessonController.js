@@ -1,4 +1,43 @@
 import Lesson from "../models/Lesson.js";
+import Module from "../models/Module.js";
+
+/**
+ * Full-text-ish lesson search for the AI tutor's deep links.
+ * GET /api/modules/search?q=superposition → matching lessons (title match).
+ */
+export const searchLessons = async (req, res) => {
+  const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  if (!q) {
+    return res.status(400).json({ message: "Query parameter q is required", lessons: [] });
+  }
+
+  try {
+    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const lessons = await Lesson.find({ title: { $regex: escaped, $options: "i" } })
+      .sort({ order: 1 })
+      .limit(10)
+      .lean();
+
+    const moduleIds = [...new Set(lessons.map((l) => l.moduleId))];
+    const modules = await Module.find({ _id: { $in: moduleIds } })
+      .select("title")
+      .lean();
+    const titleById = new Map(modules.map((m) => [String(m._id), m.title]));
+
+    const result = lessons.map((l) => ({
+      ...l,
+      moduleTitle: titleById.get(String(l.moduleId)) || null,
+    }));
+
+    res.status(200).json({ message: "Lessons found", lessons: result });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to search lessons",
+      error: error.message,
+      lessons: [],
+    });
+  }
+};
 
 export const createLesson = async (req, res) => {
   try {

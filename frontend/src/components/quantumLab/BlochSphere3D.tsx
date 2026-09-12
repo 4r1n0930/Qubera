@@ -83,7 +83,7 @@ function createTextSprite(
   return sprite
 }
 
-const DEFAULT_CAMERA_POS: [number, number, number] = [2.2, 1.8, 3.2]
+const DEFAULT_CAMERA_POS: [number, number, number] = [2.2, -2.4, 1.6]
 
 export function BlochSphere3D({
   mode,
@@ -121,6 +121,7 @@ export function BlochSphere3D({
     sceneRef.current = scene
 
     const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 50)
+    camera.up.set(0, 0, 1)
     camera.position.set(...DEFAULT_CAMERA_POS)
     camera.lookAt(0, 0, 0)
     cameraRef.current = camera
@@ -258,18 +259,20 @@ export function BlochSphere3D({
     const coneMatY = new THREE.MeshBasicMaterial({ color: 0x10b981 })
     const coneMatZ = new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
 
+    const vY = new THREE.Vector3(0, 1, 0)
     const coneX = new THREE.Mesh(coneGeo, coneMatX)
     coneX.position.set(axisLen, 0, 0)
-    coneX.rotation.z = -Math.PI / 2
+    coneX.quaternion.setFromUnitVectors(vY, new THREE.Vector3(1, 0, 0))
     staticGroup.add(coneX)
 
     const coneY = new THREE.Mesh(coneGeo, coneMatY)
     coneY.position.set(0, axisLen, 0)
+    coneY.quaternion.setFromUnitVectors(vY, new THREE.Vector3(0, 1, 0))
     staticGroup.add(coneY)
 
     const coneZ = new THREE.Mesh(coneGeo, coneMatZ)
     coneZ.position.set(0, 0, axisLen)
-    coneZ.rotation.x = Math.PI / 2
+    coneZ.quaternion.setFromUnitVectors(vY, new THREE.Vector3(0, 0, 1))
     staticGroup.add(coneZ)
 
     // Cardinal Labels
@@ -398,9 +401,16 @@ export function BlochSphere3D({
 
         // Vector shaft (cylinder from origin to vector tip)
         const shaftRadius = selectedQubit === 'all' ? 0.016 : 0.022
-        const shaftGeo = new THREE.CylinderGeometry(shaftRadius, shaftRadius, len, 16)
-        shaftGeo.translate(0, len / 2, 0)
-        shaftGeo.rotateX(Math.PI / 2)
+        const coneRadius = shaftRadius * 2.6
+        const coneHeight = 0.14
+        const shaftHeight = Math.max(0.01, len - coneHeight * 0.7)
+
+        const dir = targetVec.clone().normalize()
+        const vUp = new THREE.Vector3(0, 1, 0)
+        const rotQuat = new THREE.Quaternion().setFromUnitVectors(vUp, dir)
+
+        const shaftGeo = new THREE.CylinderGeometry(shaftRadius, shaftRadius, shaftHeight, 16)
+        shaftGeo.translate(0, shaftHeight / 2, 0)
 
         const shaftMat = new THREE.MeshStandardMaterial({
           color: new THREE.Color(phaseColorStr),
@@ -410,15 +420,12 @@ export function BlochSphere3D({
           metalness: 0.1,
         })
         const shaftMesh = new THREE.Mesh(shaftGeo, shaftMat)
-        shaftMesh.lookAt(targetVec)
+        shaftMesh.quaternion.copy(rotQuat)
         group.add(shaftMesh)
 
         // Arrowhead cone
-        const coneRadius = shaftRadius * 2.6
-        const coneHeight = 0.14
         const coneGeo = new THREE.ConeGeometry(coneRadius, coneHeight, 20)
-        coneGeo.translate(0, coneHeight / 2, 0)
-        coneGeo.rotateX(Math.PI / 2)
+        coneGeo.translate(0, -coneHeight / 2, 0)
 
         const coneMat = new THREE.MeshStandardMaterial({
           color: new THREE.Color(phaseColorStr),
@@ -428,7 +435,7 @@ export function BlochSphere3D({
         })
         const coneMesh = new THREE.Mesh(coneGeo, coneMat)
         coneMesh.position.copy(targetVec)
-        coneMesh.lookAt(targetVec.clone().multiplyScalar(1.5))
+        coneMesh.quaternion.copy(rotQuat)
         group.add(coneMesh)
 
         // Glowing tip sphere for raycasting
@@ -634,7 +641,7 @@ export function BlochSphere3D({
 
   const viewFromTop = useCallback(() => {
     if (!cameraRef.current || !controlsRef.current) return
-    cameraRef.current.position.set(0, 0, 3.4)
+    cameraRef.current.position.set(0.001, -0.001, 3.4)
     cameraRef.current.lookAt(0, 0, 0)
     controlsRef.current.update()
   }, [])

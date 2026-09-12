@@ -1,8 +1,9 @@
-import { createBrowserRouter } from 'react-router-dom'
+import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { RootLayout } from '../layouts/RootLayout'
 import { PublicLayout } from '../layouts/PublicLayout'
 import { DashboardLayout } from '../layouts/DashboardLayout'
 import { LoginPage } from '../pages/LoginPage'
-import { Home } from '../pages/Home/Home'
+import { HomeRedirect } from '../pages/Home/HomeRedirect'
 import { Dashboard } from '../pages/Dashboard/Dashboard'
 import { Learn } from '../pages/Learn/Learn'
 import { QuantumLab } from '../pages/QuantumLab/QuantumLab'
@@ -12,7 +13,6 @@ import { Challenges } from '../pages/Challenges/Challenges'
 import { Progress } from '../pages/Progress/Progress'
 import { QuantumLabPage } from '../pages/QuantumLab/QuantumLabPage'
 import { Leaderboard } from '../pages/Leaderboard/Leaderboard'
-import { AITutor } from '../pages/AITutor/AITutor'
 import { Resources } from '../pages/Resources/Resources'
 import { Profile } from '../pages/Profile/Profile'
 import { SettingsPage } from '../pages/Settings/SettingsPage'
@@ -25,50 +25,57 @@ import { ResetPassword } from '../pages/ResetPassword/ResetPassword'
 import { AuthCallback } from '../pages/AuthCallback/AuthCallback'
 
 export const router = createBrowserRouter([
-  { path: '/login', element: <LoginPage /> },
-  { path: '/forgot-password', element: <ForgotPassword /> },
-  { path: '/signup', element: <Signup /> },
-  { path: '/verify-email', element: <VerifyEmail /> },
-  { path: '/reset-password', element: <ResetPassword /> },
-  { path: '/reset-password/:token', element: <ResetPassword /> },
-  { path: '/auth/callback', element: <AuthCallback /> },
   {
-    path: '/',
-    element: <PublicLayout />,
+    // Root shell. Mounts the persistent floating tutor so it — and its
+    // conversation — survive every route change within the app.
+    element: <RootLayout />,
     children: [
-      { index: true, element: <Home /> },
-      { path: 'learn', element: <Learn /> },
-      { path: 'lab', element: <QuantumLabPage /> },
-      { path: 'progress', element: <Progress /> },
-      { path: 'login', element: <LoginPage /> },
-      { path: 'forgot-password', element: <ForgotPassword /> },
-      { path: 'signup', element: <Signup /> },
-      { path: 'verify-email', element: <VerifyEmail /> },
-      { path: 'reset-password', element: <ResetPassword /> },
-      { path: 'reset-password/:token', element: <ResetPassword /> },
+      { path: '/login', element: <LoginPage /> },
+      { path: '/forgot-password', element: <ForgotPassword /> },
+      { path: '/signup', element: <Signup /> },
+      { path: '/verify-email', element: <VerifyEmail /> },
+      { path: '/reset-password', element: <ResetPassword /> },
+      { path: '/reset-password/:token', element: <ResetPassword /> },
+      { path: '/auth/callback', element: <AuthCallback /> },
+      {
+        path: '/',
+        element: <PublicLayout />,
+        children: [
+          { index: true, element: <HomeRedirect /> },
+          { path: 'learn', element: <Learn /> },
+          { path: 'lab', element: <QuantumLabPage /> },
+          { path: 'progress', element: <Progress /> },
+          { path: 'login', element: <LoginPage /> },
+          { path: 'forgot-password', element: <ForgotPassword /> },
+          { path: 'signup', element: <Signup /> },
+          { path: 'verify-email', element: <VerifyEmail /> },
+          { path: 'reset-password', element: <ResetPassword /> },
+          { path: 'reset-password/:token', element: <ResetPassword /> },
+          { path: '*', element: <NotFound /> },
+          { path: 'quantum-lab', element: <QuantumLab /> },
+          { path: 'code-editor', element: <CodeEditor /> },
+          { path: 'contact', element: <Contact /> },
+        ],
+      },
+      {
+        path: '/dashboard',
+        element: <DashboardLayout />,
+        children: [
+          { index: true, element: <Dashboard /> },
+          { path: 'learn', element: <Learn /> },
+          { path: 'quantum-lab', element: <QuantumLabPage /> },
+          { path: 'code-editor', element: <CodeEditor /> },
+          { path: 'games', element: <Games /> },
+          { path: 'challenges', element: <Challenges /> },
+          { path: 'progress', element: <Progress /> },
+          { path: 'leaderboard', element: <Leaderboard /> },
+          { path: 'ai-tutor', element: <Navigate to="/dashboard" replace /> },
+          { path: 'resources', element: <Resources /> },
+          { path: 'profile', element: <Profile /> },
+          { path: 'settings', element: <SettingsPage /> },
+        ],
+      },
       { path: '*', element: <NotFound /> },
-      { path: 'quantum-lab', element: <QuantumLab /> },
-      { path: 'code-editor', element: <CodeEditor /> },
-      { path: 'contact', element: <Contact /> },
     ],
   },
-  {
-    path: '/dashboard',
-    element: <DashboardLayout />,
-    children: [
-      { index: true, element: <Dashboard /> },
-      { path: 'learn', element: <Learn /> },
-      { path: 'quantum-lab', element: <QuantumLabPage /> },
-      { path: 'code-editor', element: <CodeEditor /> },
-      { path: 'games', element: <Games /> },
-      { path: 'challenges', element: <Challenges /> },
-      { path: 'progress', element: <Progress /> },
-      { path: 'leaderboard', element: <Leaderboard /> },
-      { path: 'ai-tutor', element: <AITutor /> },
-      { path: 'resources', element: <Resources /> },
-      { path: 'profile', element: <Profile /> },
-      { path: 'settings', element: <SettingsPage /> },
-    ],
-  },
-  { path: '*', element: <NotFound /> },
 ])

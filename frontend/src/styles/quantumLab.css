@@ -1331,8 +1331,8 @@
 
 /* Container: full available height, capped width, centered */
 .qlab-container-new {
-  height: calc(100vh - var(--header-height) - 64px);
-  min-height: 640px;
+  height: calc(100dvh - 132px);
+  min-height: 540px;
   max-width: 100%;
   display: flex;
   flex-direction: column;
@@ -1357,13 +1357,28 @@
   min-height: 0;
 }
 
-/* Section B — Measurements / results (smaller share) */
+/* Section B — Measurements / results (fills remaining width, shared height) */
 .qlab-new-results-section {
-  width: 92%;
-  max-width: var(--content-wide);
-  margin-inline: auto;
+  width: 100%;
+  max-width: none;
   flex: 1 1 0;
   min-height: 200px;
+}
+
+/* Responsive: relax the fixed-height stage so panels stack and scroll naturally */
+@media (max-width: 960px) {
+  .qlab-container-new {
+    height: auto;
+    min-height: 0;
+  }
+  .qlab-main-row {
+    flex: none;
+    min-height: 380px;
+  }
+  .qlab-new-results-section {
+    flex: none;
+    min-height: 340px;
+  }
 }
 
 /* ---------------- Layout wrapper (palette + builder as one panel) ---------------- */
@@ -2336,6 +2351,87 @@
 .qlab-bloch-state-label.is-front { fill: var(--color-text-muted); }
 .qlab-bloch-state-label.is-back { fill: var(--color-border-strong); }
 
+/* Floating State Label Badge (PART 2) */
+.qlab-bloch-state-overlay {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 10;
+  pointer-events: none;
+  background: rgba(15, 23, 42, 0.78);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  color: var(--color-text);
+  font-size: 0.65rem;
+  line-height: 1.3;
+}
+.qlab-bloch-state-overlay-title {
+  font-weight: 700;
+  color: #38bdf8;
+}
+.qlab-bloch-state-overlay-sub {
+  color: var(--color-text-muted);
+  font-size: 0.6rem;
+}
+.qlab-bloch-state-overlay-coords {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+/* Execution status — top-right of the results header (PART 3) */
+.qlab-toolbar-right {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.qlab-toolbar-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.725rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+.qlab-toolbar-status-running {
+  color: var(--color-text-muted);
+}
+.qlab-toolbar-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+.qlab-time-icon {
+  color: #38bdf8;
+}
+.qlab-time-val {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: #38bdf8;
+}
+.qlab-time-note {
+  font-size: 0.625rem;
+  color: var(--color-text-muted);
+}
+.qlab-stale-chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  white-space: nowrap;
+}
+
 /* Qubit selector above the Bloch sphere for multi-qubit circuits */
 .qlab-bloch-qubit-select {
   flex-shrink: 0;
@@ -2633,6 +2729,9 @@
   .qlab-toolbar-left {
     flex-wrap: wrap;
     gap: var(--space-2);
+  }
+  .qlab-toolbar-right {
+    flex-wrap: wrap;
   }
   .qlab-toolbar-divider {
     display: none;

@@ -23,7 +23,7 @@ export function GatePalette() {
   }
 
   return (
-    <div className="qlab-palette">
+    <div className="qlab-palette" data-tutor-id="gate-palette">
       <div className="qlab-palette-head">
         <span className="qlab-palette-title">Gates</span>
         <span className="qlab-palette-sub">drag onto a wire</span>
@@ -48,16 +48,17 @@ export function GatePalette() {
                   className={`qlab-palette-chev ${isOpen ? 'is-open' : ''}`}
                 />
               </button>
-              {isOpen && (
-                <div className="qlab-palette-gates">
-                  {gates.map((gate) => (
-                    <button
-                      key={gate.type}
-                      type="button"
-                      className={`qlab-palette-gate qlab-palette-gate-${String(gate.type).toLowerCase()}`}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, gate)}
-                    >
+{isOpen && (
+                    <div className="qlab-palette-gates">
+                      {gates.map((gate) => (
+                        <button
+                          key={gate.type}
+                          type="button"
+                          className={`qlab-palette-gate qlab-palette-gate-${String(gate.type).toLowerCase()}`}
+                          data-tutor-id={`gate-${String(gate.type).toLowerCase()}`}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, gate)}
+                        >
                       <GripVertical size={10} className="qlab-palette-gate-grip" />
                       <span className="qlab-palette-gate-symbol">{gate.symbol}</span>
                     </button>

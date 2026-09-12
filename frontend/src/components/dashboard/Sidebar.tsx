@@ -106,6 +106,7 @@ function SidebarLink({
       to={item.to}
       end={item.to === '/dashboard'}
       onClick={onClose}
+      aria-label={item.label}
     >
       {({ isActive }) => (
         <div

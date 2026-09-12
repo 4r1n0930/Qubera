@@ -160,6 +160,9 @@ export function blochFromStatevector(
   qubit: number,
   numQubits: number
 ): BlochVector {
+  if (numQubits === 1 && statevector.length >= 2) {
+    return pureStateBloch(statevector[0], statevector[1])
+  }
   return blochFromRho(qubitReducedDensityMatrix(statevector, qubit, numQubits))
 }
 

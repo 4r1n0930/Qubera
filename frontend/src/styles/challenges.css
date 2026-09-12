@@ -1,0 +1,927 @@
+/* ==========================================================================
+   QUBERA Quantum Challenges — Guess the Output UI Styles
+   ========================================================================== */
+
+.qlab-challenges-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  width: 100%;
+  max-width: var(--content-wide, 1400px);
+  min-height: calc(100vh - 120px);
+  margin-inline: auto;
+  padding: 0.5rem 1rem 2rem;
+  box-sizing: border-box;
+}
+
+/* --------------------------------------------------------------------------
+   Challenge Header & Nav
+   -------------------------------------------------------------------------- */
+.qlab-challenge-header {
+  background: var(--color-surface, #181c24);
+  border: 1px solid var(--color-border, #2a313d);
+  border-radius: var(--radius-lg, 12px);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.2);
+}
+
+.qlab-challenge-header-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.qlab-challenge-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex: 1;
+  min-width: 280px;
+}
+
+.qlab-challenge-badges {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.qlab-diff-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+}
+
+.qlab-diff-badge.beginner {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.qlab-diff-badge.intermediate {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.qlab-diff-badge.advanced {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.qlab-topic-badge {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-secondary, #94a3b8);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border, #2a313d);
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+}
+
+.qlab-completed-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+}
+
+.qlab-attempts-badge {
+  font-size: 0.72rem;
+  color: #a78bfa;
+  background: rgba(139, 92, 246, 0.12);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+}
+
+.qlab-challenge-title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--color-text-primary, #f8fafc);
+  letter-spacing: -0.01em;
+}
+
+.qlab-challenge-desc {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary, #94a3b8);
+  line-height: 1.45;
+  max-width: 800px;
+}
+
+.qlab-challenge-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.qlab-challenge-stepper {
+  display: flex;
+  align-items: center;
+  background: var(--color-background, #0f1218);
+  border: 1px solid var(--color-border, #2a313d);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.qlab-nav-arrow {
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary, #94a3b8);
+  padding: 0.5rem 0.6rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.qlab-nav-arrow:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-text-primary, #f8fafc);
+}
+
+.qlab-nav-arrow:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.qlab-challenge-select {
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--color-border, #2a313d);
+  border-right: 1px solid var(--color-border, #2a313d);
+  color: var(--color-text-primary, #f8fafc);
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 0.5rem 0.8rem;
+  cursor: pointer;
+  outline: none;
+  max-width: 260px;
+}
+
+.qlab-challenge-select option {
+  background: #181c24;
+  color: #f8fafc;
+}
+
+.qlab-hint-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(234, 179, 8, 0.1);
+  border: 1px solid rgba(234, 179, 8, 0.25);
+  color: #facc15;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.5rem 0.85rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.qlab-hint-btn:hover,
+.qlab-hint-btn.is-active {
+  background: rgba(234, 179, 8, 0.2);
+  border-color: rgba(234, 179, 8, 0.5);
+  color: #fde047;
+}
+
+.qlab-challenge-hint-box {
+  background: rgba(234, 179, 8, 0.07);
+  border: 1px solid rgba(234, 179, 8, 0.25);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.qlab-hint-icon {
+  color: #facc15;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.qlab-hint-text {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #fef08a;
+}
+
+/* --------------------------------------------------------------------------
+   Challenge Main Workspace Grid
+   -------------------------------------------------------------------------- */
+.qlab-challenge-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  min-height: 520px;
+}
+
+@media (max-width: 1024px) {
+  .qlab-challenge-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.qlab-challenge-circuit-section,
+.qlab-challenge-action-section {
+  background: var(--color-surface, #181c24);
+  border: 1px solid var(--color-border, #2a313d);
+  border-radius: var(--radius-lg, 12px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.15);
+}
+
+.qlab-challenge-pane-head {
+  padding: 0.75rem 1.25rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid var(--color-border, #2a313d);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.qlab-pane-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.qlab-pane-icon {
+  color: #06b6d4;
+}
+
+.qlab-pane-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--color-text-primary, #f8fafc);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.qlab-readonly-pill {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--color-border, #2a313d);
+  color: var(--color-text-secondary, #94a3b8);
+}
+
+.qlab-toggle-inspect-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(6, 182, 212, 0.1);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  color: #06b6d4;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.3rem 0.65rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.qlab-toggle-inspect-btn:hover {
+  background: rgba(6, 182, 212, 0.2);
+  color: #22d3ee;
+}
+
+.qlab-challenge-builder-wrapper {
+  flex: 1;
+  min-height: 440px;
+  position: relative;
+  background: var(--color-background, #0f1218);
+  overflow: hidden;
+}
+
+.qlab-challenge-results-wrapper {
+  flex: 1;
+  min-height: 440px;
+  overflow-y: auto;
+  padding: 0.5rem;
+}
+
+/* --------------------------------------------------------------------------
+   Prediction Panel
+   -------------------------------------------------------------------------- */
+.qlab-prediction-panel {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.qlab-pred-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.qlab-pred-heading {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-text-primary, #f8fafc);
+}
+
+.qlab-pred-sub {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--color-text-secondary, #94a3b8);
+  line-height: 1.4;
+}
+
+/* Multiple choice cards */
+.qlab-pred-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.qlab-pred-option-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--color-border, #2a313d);
+  border-radius: 10px;
+  padding: 0.9rem 1.1rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.qlab-pred-option-card:hover:not(:disabled) {
+  border-color: rgba(6, 182, 212, 0.4);
+  background: rgba(6, 182, 212, 0.04);
+}
+
+.qlab-pred-option-card.is-selected {
+  border-color: #06b6d4;
+  background: rgba(6, 182, 212, 0.08);
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.15);
+}
+
+.qlab-pred-radio {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border, #2a313d);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+  transition: border-color 0.2s;
+}
+
+.qlab-pred-option-card.is-selected .qlab-pred-radio {
+  border-color: #06b6d4;
+}
+
+.qlab-radio-inner {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #06b6d4;
+  transform: scale(0);
+  transition: transform 0.2s ease;
+}
+
+.qlab-pred-option-card.is-selected .qlab-radio-inner {
+  transform: scale(1);
+}
+
+.qlab-pred-option-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.qlab-pred-option-label {
+  font-size: 0.92rem;
+  color: var(--color-text-primary, #f8fafc);
+}
+
+.qlab-pred-option-desc {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary, #94a3b8);
+  line-height: 1.35;
+}
+
+/* Distribution Table */
+.qlab-pred-distribution {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.qlab-pred-dist-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.qlab-pred-preset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--color-border, #2a313d);
+  color: var(--color-text-secondary, #94a3b8);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.qlab-pred-preset-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-text-primary, #f8fafc);
+}
+
+.qlab-pred-sum-indicator {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+}
+
+.qlab-sum-label {
+  color: var(--color-text-secondary, #94a3b8);
+}
+
+.qlab-sum-val {
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+}
+
+.qlab-sum-val.is-valid {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.qlab-sum-val.is-invalid {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.qlab-pred-table-wrap {
+  border: 1px solid var(--color-border, #2a313d);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.qlab-pred-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.qlab-pred-table th {
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--color-text-secondary, #94a3b8);
+  font-weight: 600;
+  text-align: left;
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid var(--color-border, #2a313d);
+}
+
+.qlab-pred-table td {
+  padding: 0.55rem 0.85rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  vertical-align: middle;
+}
+
+.qlab-pred-table tr:last-child td {
+  border-bottom: none;
+}
+
+.qlab-pred-basis-cell code {
+  font-size: 0.88rem;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.08);
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+}
+
+.qlab-input-group {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.qlab-pred-number-input {
+  width: 76px;
+  background: var(--color-background, #0f1218);
+  border: 1px solid var(--color-border, #2a313d);
+  color: var(--color-text-primary, #f8fafc);
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.qlab-pred-number-input:focus {
+  border-color: #06b6d4;
+}
+
+.qlab-pct-chip {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary, #94a3b8);
+  min-width: 36px;
+}
+
+.qlab-pred-bar-cell {
+  width: 35%;
+}
+
+.qlab-pred-mini-track {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.qlab-pred-mini-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #06b6d4, #6366f1);
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+
+/* Submit Area */
+.qlab-pred-submit-area {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding-top: 1rem;
+}
+
+.qlab-pred-submit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  background: linear-gradient(135deg, #06b6d4, #3b82f6);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.85rem 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s, box-shadow 0.2s;
+  box-shadow: 0 4px 14px rgba(6, 182, 212, 0.35);
+}
+
+.qlab-pred-submit-btn:hover:not(:disabled) {
+  opacity: 0.95;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(6, 182, 212, 0.45);
+}
+
+.qlab-pred-submit-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.qlab-pred-note {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #94a3b8);
+  text-align: center;
+}
+
+.qlab-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* --------------------------------------------------------------------------
+   Result Modal Popup
+   -------------------------------------------------------------------------- */
+.qlab-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1.5rem;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.qlab-challenge-modal {
+  background: #181c24;
+  border: 1px solid var(--color-border, #2a313d);
+  border-radius: 14px;
+  width: 100%;
+  max-width: 580px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.75rem;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+}
+
+.qlab-challenge-modal.is-correct {
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.qlab-challenge-modal.is-incorrect {
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+.qlab-modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary, #94a3b8);
+  cursor: pointer;
+  padding: 0.35rem;
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+
+.qlab-modal-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-text-primary, #f8fafc);
+}
+
+.qlab-cmodal-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.4rem;
+}
+
+.qlab-cmodal-icon-wrap {
+  margin-bottom: 0.25rem;
+}
+
+.qlab-cmodal-icon.success {
+  color: #10b981;
+}
+
+.qlab-cmodal-icon.warning {
+  color: #f59e0b;
+}
+
+.qlab-cmodal-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.qlab-cmodal-subtitle {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #94a3b8;
+}
+
+.qlab-cmodal-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+}
+
+.qlab-cmodal-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.76rem;
+  color: #94a3b8;
+}
+
+.qlab-cmodal-chip strong {
+  color: #f8fafc;
+}
+
+.qlab-cmodal-comparison {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.qlab-cmodal-section-title {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+}
+
+.qlab-choice-comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.qlab-choice-box {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--color-border, #2a313d);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.qlab-box-label {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.qlab-box-val {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.qlab-box-val.match {
+  color: #10b981;
+}
+
+.qlab-box-val.mismatch {
+  color: #f87171;
+}
+
+.qlab-table-comparison {
+  border: 1px solid var(--color-border, #2a313d);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.qlab-cmodal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.qlab-cmodal-table th {
+  background: rgba(255, 255, 255, 0.03);
+  color: #94a3b8;
+  font-weight: 600;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--color-border, #2a313d);
+}
+
+.qlab-cmodal-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.qlab-cmodal-table tr:last-child td {
+  border-bottom: none;
+}
+
+.qlab-match-indicator {
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.qlab-match-indicator.good {
+  color: #10b981;
+}
+
+.qlab-match-indicator.bad {
+  color: #f87171;
+}
+
+.qlab-cmodal-explanation {
+  background: rgba(56, 189, 248, 0.05);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.qlab-exp-header {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: #38bdf8;
+  font-size: 0.82rem;
+}
+
+.qlab-exp-text {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: #cbd5e1;
+}
+
+.qlab-cmodal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.qlab-cbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 0.6rem 1.1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.qlab-cbtn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--color-border, #2a313d);
+  color: #f8fafc;
+}
+
+.qlab-cbtn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.qlab-cbtn-primary {
+  background: #06b6d4;
+  border: 1px solid #0891b2;
+  color: #ffffff;
+}
+
+.qlab-cbtn-primary:hover {
+  background: #0891b2;
+}

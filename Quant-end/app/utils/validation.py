@@ -2,7 +2,7 @@
 
 from app.exception import APIError
 
-SINGLE_QUBIT_GATES = {"I", "X", "Y", "Z", "H", "S", "Sdg", "T", "Tdg"}
+SINGLE_QUBIT_GATES = {"I", "X", "Y", "Z", "H", "S", "Sdg", "T", "Tdg", "SX"}
 ROTATION_GATES = {"RX", "RY", "RZ", "P"}
 TWO_QUBIT_GATES = {"CNOT", "CX", "CZ", "SWAP"}
 TWO_QUBIT_ROTATION_GATES = {"RXX", "RZZ"}

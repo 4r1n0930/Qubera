@@ -8,7 +8,12 @@
  */
 
 import type { CircuitState, GateOperation } from '../types/quantumLab'
-import type { CircuitIR, CircuitOperation } from '../api/quantumApi'
+import type {
+  CircuitIR,
+  CircuitOperation,
+  QuantumOutput,
+} from '../api/quantumApi'
+import { DEFAULT_QUANTUM_OUTPUTS } from '../api/quantumApi'
 
 /** Editor gate name → execution-engine gate name (only where they differ). */
 const GATE_NAME_TO_API: Record<string, string> = {
@@ -43,4 +48,24 @@ function operationToApiOperation(op: GateOperation): CircuitOperation {
     targets: [...op.targets],
     ...(params && params.length > 0 ? { params } : {}),
   }
+}
+
+/**
+ * Whether the circuit performs a mid-circuit reset. These collapse the
+ * wavefunction stochastically, so statevector/bloch_vectors are not well
+ * defined and the execution service rejects them when requested.
+ */
+export function hasResetOperation(circuit: CircuitState): boolean {
+  return circuit.operations.some((op) => op.gate === 'RESET')
+}
+
+/**
+ * The outputs to request for a given circuit: with a reset only counts and
+ * probabilities (derived from counts) can be produced; every other circuit
+ * requests all four datasets (counts, probabilities, statevector, bloch).
+ */
+export function resolveRequestedOutputs(circuit: CircuitState): QuantumOutput[] {
+  return hasResetOperation(circuit)
+    ? ['counts', 'probabilities']
+    : [...DEFAULT_QUANTUM_OUTPUTS]
 }

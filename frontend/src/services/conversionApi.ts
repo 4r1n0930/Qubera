@@ -121,8 +121,9 @@ export async function codeToIrApi(payload: CodeToIrPayload): Promise<CodeToIrRes
 
     const conversionErr = err as ConversionError
     const unreachable =
-      conversionErr instanceof ConversionError &&
-      (conversionErr.status === undefined || conversionErr.status >= 500)
+      (conversionErr instanceof ConversionError &&
+        (conversionErr.status === undefined || conversionErr.status >= 500)) ||
+      !(conversionErr instanceof ConversionError)
 
     if (unreachable) {
       if (isPythonFramework(payload.framework)) {

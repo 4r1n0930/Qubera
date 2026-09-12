@@ -8,6 +8,8 @@ import moduleRoutes from "./routes/moduleRoutes.js";
 import lessonRoutes from "./routes/lessonRoutes.js";
 import conversionRoutes from "./routes/conversionRoutes.js";
 import quantumRoutes from "./routes/quantumRoutes.js";
+import tutorRoutes from "./tutor/routes/tutorRoutes.js";
+import progressRoutes from "./routes/progressRouter.js";
 
 dotenv.config();
 
@@ -27,7 +29,9 @@ app.use("/auth", authRoutes);
 app.use("/api/modules", moduleRoutes);
 app.use("/api/lessons", lessonRoutes);
 app.use("/api/conversion", conversionRoutes);
+app.use("/api/progress", progressRoutes);
 app.use("/api", quantumRoutes);
+app.use("/api", tutorRoutes);
 
 const PORT = process.env.PORT || 3000;
 

@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
+import { useTutorOpen } from '../tutor/tutorOpen'
 import {
-  Search,
+  Sparkles,
   Flame,
   Bell,
   User,
   Settings,
   LogOut,
   BookOpen,
-  Sparkles,
   Trophy,
   Menu,
 } from 'lucide-react'
@@ -21,9 +21,9 @@ interface TopBarProps {
 export function TopBar({ onOpenSidebar }: TopBarProps) {
   const navigate = useNavigate()
   const { logout } = useAuth()
+  const { open: openTutor } = useTutorOpen()
   const [notifOpen, setNotifOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
-  const [search, setSearch] = useState('')
 
   const notifRef = useRef<HTMLDivElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
@@ -62,18 +62,22 @@ export function TopBar({ onOpenSidebar }: TopBarProps) {
         <Menu size={20} />
       </button>
 
-      <div className="dash-topbar-search">
-        <Search size={18} aria-hidden="true" />
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search topics, labs, challenges..."
-          aria-label="Search topics, labs, challenges"
-        />
-      </div>
-
       <div className="dash-topbar-actions">
+        <button
+          type="button"
+          className="dash-icon-btn dash-berry-launcher"
+          aria-label="Open AI Tutor"
+          title="Ask Berry your quantum questions"
+          onClick={() => {
+            setNotifOpen(false)
+            setProfileOpen(false)
+            openTutor()
+          }}
+        >
+          <Sparkles size={19} />
+          <span className="dash-dot dash-dot-berry" aria-hidden="true" />
+        </button>
+
         <span className="dash-streak dash-topbar-streak">
           <Flame size={17} fill="#f0a83b" stroke="#a5761c" aria-hidden="true" />
           6 day streak
@@ -108,7 +112,10 @@ export function TopBar({ onOpenSidebar }: TopBarProps) {
               <button
                 type="button"
                 className="dash-dropdown-item"
-                onClick={() => navigate('/dashboard/ai-tutor')}
+                onClick={() => {
+                  setNotifOpen(false)
+                  openTutor()
+                }}
               >
                 <Sparkles size={16} /> AI Tutor replied to you
               </button>

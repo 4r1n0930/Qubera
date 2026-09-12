@@ -1,12 +1,6 @@
-import { Swords } from 'lucide-react'
-import { PlaceholderPage } from '../../components/dashboard/PlaceholderPage'
+import { GuessTheOutput } from '../../components/challenges/GuessTheOutput'
 
 export function Challenges() {
-  return (
-    <PlaceholderPage
-      icon={Swords}
-      title="Challenges"
-      description="Tackle daily and community challenges, solve circuits and climb the ranks for Q-XP rewards."
-    />
-  )
+  return <GuessTheOutput />
 }
+

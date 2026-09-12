@@ -16,6 +16,7 @@ GATE_MAP = {
     "Sdg": cirq.S ** -1,
     "T": cirq.T,
     "Tdg": cirq.T ** -1,
+    "SX": cirq.X ** 0.5,
     "CNOT": cirq.CNOT,
     "CX": cirq.CNOT,
     "CZ": cirq.CZ,
