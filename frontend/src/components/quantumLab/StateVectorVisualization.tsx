@@ -13,6 +13,8 @@ interface BasisState {
   imag: number
   magnitude: number
   phase: number
+  /** Ideal probability P = |α|² for this basis state. */
+  probability: number
   /** Measurement count from the simulator's shot-based execution. */
   count: number | undefined
   /** Whether the backend actually produced counts for this run. */
@@ -67,11 +69,13 @@ interface Props {
   statevector?: ComplexAmplitude[]
   /** Bitstring-keyed measurement counts from the simulator. */
   counts?: Record<string, number>
+  /** Bitstring-keyed probabilities from the simulator (authoritative when present). */
+  probabilities?: Record<string, number>
   /** Number of shots used for the (optional) counts. */
   shots?: number
 }
 
-export function StateVectorVisualization({ statevector, counts, shots }: Props) {
+export function StateVectorVisualization({ statevector, counts, probabilities, shots }: Props) {
   const [selectedIdx, setSelectedIdx] = useState(0)
   const [activeTab, setActiveTab] = useState<Tab>('table')
 
@@ -86,6 +90,7 @@ export function StateVectorVisualization({ statevector, counts, shots }: Props) 
     return statevector.map((amp, i) => {
       const label = i.toString(2).padStart(numQubits, '0')
       const magnitude = Math.sqrt(amp.real ** 2 + amp.imag ** 2)
+      const probability = probabilities?.[label] ?? magnitude ** 2
       const phaseRad = Math.atan2(amp.imag, amp.real)
       const phase = Math.round((phaseRad * 180) / Math.PI)
       return {
@@ -94,11 +99,12 @@ export function StateVectorVisualization({ statevector, counts, shots }: Props) 
         imag: amp.imag,
         magnitude,
         phase,
+        probability,
         count: counts?.[label],
         hasCounts,
       }
     })
-  }, [statevector, counts, numQubits, hasCounts])
+  }, [statevector, counts, probabilities, numQubits, hasCounts])
 
   // Selection clamps to the current data length.
   const safeIdx = data.length === 0 ? 0 : Math.min(selectedIdx, data.length - 1)
@@ -200,6 +206,14 @@ export function StateVectorVisualization({ statevector, counts, shots }: Props) 
               </div>
               <div className="q-sv-selected-item">
                 <span className="q-sv-selected-label">
+                  Probability |α|² <InfoTip text="Probability of measuring this basis state: |α|² = (Re α)² + (Im α)². Distinct from the amplitude itself." />
+                </span>
+                <span className="q-sv-selected-value q-sv-mono q-sv-count">
+                  {(selected.probability * 100).toFixed(2)}%
+                </span>
+              </div>
+              <div className="q-sv-selected-item">
+                <span className="q-sv-selected-label">
                   Real part <InfoTip text="Re(α): the real component of the complex amplitude." />
                 </span>
                 <span className="q-sv-selected-value q-sv-mono">{fmt(selected.real)}</span>
@@ -248,6 +262,9 @@ export function StateVectorVisualization({ statevector, counts, shots }: Props) 
                     Imaginary <InfoTip text="Im(α)" />
                   </th>
                   <th>
+                    Prob (|α|²) <InfoTip text="Probability of measuring this basis state, P = |α|² = (Re α)² + (Im α)². Reported separately from the complex amplitude." />
+                  </th>
+                  <th>
                     Counts{' '}
                     <InfoTip
                       text={
@@ -270,6 +287,7 @@ export function StateVectorVisualization({ statevector, counts, shots }: Props) 
                     <td className="q-sv-mono q-sv-amp">{complexString(s.real, s.imag)}</td>
                     <td className="q-sv-mono">{fmt(s.real)}</td>
                     <td className="q-sv-mono">{fmt(s.imag)}</td>
+                    <td className="q-sv-mono q-sv-count">{(s.probability * 100).toFixed(2)}%</td>
                     <td className="q-sv-mono q-sv-count">{fmtCount(s.count)}</td>
                   </tr>
                 ))}

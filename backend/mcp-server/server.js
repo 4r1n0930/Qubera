@@ -1,12 +1,26 @@
+import dotenv from "dotenv";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import circuitService from "./services/circuitService.js";
+import { registerTutorTools } from "./services/tutorTools.js";
+import { ensureDb } from "./services/db.js";
 import { z } from "zod";
+
+dotenv.config();
 
 const server = new McpServer({
   name: "quantum-circuit-server",
-  version: "1.0.0",
+  version: "2.0.0",
 });
+
+// Tutor capability tools (navigation, UI guidance, context, lab, progress).
+registerTutorTools(server);
+
+// Eagerly warm the database when asked (dev convenience); progress tools also
+// connect lazily on demand. Never awaited before the stdio handshake.
+if (process.env.MCP_CONNECT_DB === "1" || process.env.MCP_CONNECT_DB === "true") {
+  ensureDb();
+}
 
 server.tool(
   "add_gate",

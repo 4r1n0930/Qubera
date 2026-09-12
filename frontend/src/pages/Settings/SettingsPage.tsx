@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import {
   Settings,
   User,
@@ -286,15 +286,12 @@ export function SettingsPage() {
   const { logout } = useAuth()
 
   const set = useCallback(
-    <K extends keyof SettingsState>(key: K, val: SettingsState[K]) =>
-      setSettings((s) => ({ ...s, [key]: val })),
+    <K extends keyof SettingsState>(key: K, val: SettingsState[K]) => {
+      setSettings((s) => ({ ...s, [key]: val }))
+      setSaveStatus('idle')
+    },
     []
   )
-
-  // Reset save status on change
-  useEffect(() => {
-    if (saveStatus === 'saved') setSaveStatus('idle')
-  }, [settings, saveStatus])
 
   const handleSave = useCallback(() => {
     setSaveStatus('saving')
@@ -309,7 +306,7 @@ export function SettingsPage() {
   }, [logout])
 
   return (
-    <div className="dash-page" style={{ display: 'grid', gap: 18, maxWidth: 780 }}>
+    <div className="dash-page" style={{ display: 'grid', gap: 18, maxWidth: 1080 }}>
       {/* Page header */}
       <div style={{ paddingTop: 4 }}>
         <h1

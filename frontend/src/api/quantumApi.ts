@@ -62,6 +62,7 @@ export interface QuantumExecutionResponse {
   statevector?: ComplexAmplitude[]
   bloch_vectors?: Record<string, BlochVector>
   elapsed_time_ms?: number
+  elapsed?: number
 }
 
 /** Structured execution failure. `type` uses the gateway/Python error codes. */

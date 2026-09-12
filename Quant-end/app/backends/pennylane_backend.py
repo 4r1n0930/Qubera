@@ -14,6 +14,7 @@ GATE_MAP = {
     "Sdg": qml.adjoint(qml.S),
     "T": qml.T,
     "Tdg": qml.adjoint(qml.T),
+    "SX": qml.SX,
     "RX": qml.RX,
     "RY": qml.RY,
     "RZ": qml.RZ,

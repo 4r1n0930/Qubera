@@ -16,13 +16,15 @@ import { ResultsPanel } from './ResultsPanel'
 import { CodePanel } from './CodePanel'
 import {
   executeQuantumCircuit,
-  DEFAULT_QUANTUM_OUTPUTS,
   QuantumExecutionError,
   type QuantumBackend,
 } from '../../api/quantumApi'
-import { circuitToApiIr } from '../../utils/circuitToApi'
+import { circuitToApiIr, resolveRequestedOutputs } from '../../utils/circuitToApi'
 import { generateCircuitCode } from '../../utils/codeSync'
 import { codeToIrApi, ConversionError } from '../../services/conversionApi'
+import { setTutorContext } from '../../tutor/tutorContextStore'
+import { registerEditorHandle } from '../../tutor/editorBridge'
+import type { EditorHandle } from '../../tutor/editorBridge'
 import { useDebouncedCallback } from '../../utils/debounce'
 import '../../styles/quantumLab.css'
 
@@ -167,6 +169,8 @@ export function QuantumLab() {
   const runningRef = useRef(false)
   const runControllerRef = useRef<AbortController | null>(null)
   const runVersion = useRef(0)
+  /** Serialized Circuit IR of the last successful execution (null before any). */
+  const lastRunCircuitRef = useRef<string | null>(null)
 
   // ---------------- Code ↔ circuit synchronization ----------------
   const [framework, setFramework] = useState<Framework>(routeCodeState?.framework ?? 'qiskit')
@@ -203,6 +207,11 @@ export function QuantumLab() {
   const numQubits = circuit.num_qubits
   const width = circuitWidth(circuit)
   const ToggleIcon = MODE_META[mode].icon
+
+  // Whether the stored execution result reflects the circuit shown now.
+  const lastRunIr = lastRunCircuitRef.current
+  const circuitModified =
+    lastRunIr !== null && lastRunIr !== JSON.stringify(circuitToApiIr(circuit))
 
   /**
    * circuit → code (local, synchronous). Runs whenever the circuit or target
@@ -380,9 +389,12 @@ export function QuantumLab() {
   const handleClear = useCallback(() => {
     circuitSourceRef.current = 'circuit'
     latestCircuit({ ...circuitRef.current, operations: [] })
-    const current = runVersion.current
-    runVersion.current = current + 1
+    runVersion.current += 1
+    // Drop any in-flight request AND release the run lock so the next Run is
+    // never blocked by a superseded request's (skipped) finally block.
     runControllerRef.current?.abort()
+    runControllerRef.current = null
+    runningRef.current = false
     setExecution({ status: 'idle' })
     setSelectedGateId(null)
   }, [latestCircuit])
@@ -406,9 +418,49 @@ export function QuantumLab() {
     }
   }, [])
 
+  // Publish the live lab state to the tutor context store so the AI tutor can
+  // see the student's actual circuit, code, target framework and the outcome
+  // of the most recent execution.
+  useEffect(() => {
+    setTutorContext({
+      screen: 'quantumLab',
+      circuit: circuitToApiIr(circuit),
+      code,
+      framework,
+      lastExecutionResult: execution.status === 'success' ? execution.result : undefined,
+    })
+  }, [circuit, code, framework, execution])
+
+  // Expose the Monaco editor to the tutor's highlight_code action.
+  const handleEditorMount = useCallback((editor: unknown) => {
+    const handle: EditorHandle = {
+      revealLine: (line: number) => {
+        const monacoEditor = editor as {
+          revealLineInCenter: (l: number) => void
+          setPosition: (pos: { lineNumber: number; column: number }) => void
+        }
+        try {
+          monacoEditor.revealLineInCenter(line)
+          monacoEditor.setPosition({ lineNumber: line, column: 1 })
+          return true
+        } catch {
+          return false
+        }
+      },
+    }
+    registerEditorHandle(handle)
+  }, [])
+
+  useEffect(() => {
+    return () => registerEditorHandle(null)
+  }, [])
+
   /**
    * Run the current circuit through the Node gateway → Python service.
    * One execution produces one result object consumed by all visualizations.
+   * The requested outputs depend on the circuit: circuits with mid-circuit
+   * resets cannot produce an exact statevector, so they request counts and
+   * probabilities only (the service rejects the exact outputs otherwise).
    */
   const handleRun = useCallback(async () => {
     if (runningRef.current) return
@@ -427,11 +479,12 @@ export function QuantumLab() {
           backend,
           shots,
           circuit: circuitToApiIr(circuitRef.current),
-          output: DEFAULT_QUANTUM_OUTPUTS,
+          output: resolveRequestedOutputs(circuitRef.current),
         },
         controller.signal
       )
       if (requestId !== runVersion.current) return
+      lastRunCircuitRef.current = JSON.stringify(circuitToApiIr(circuitRef.current))
       setExecution({ status: 'success', result })
     } catch (err) {
       if (controller.signal.aborted || requestId !== runVersion.current) return
@@ -443,7 +496,10 @@ export function QuantumLab() {
             : { type: 'UNKNOWN', message: 'Quantum execution failed.' },
       })
     } finally {
-      if (requestId === runVersion.current) {
+      // Ownership-based cleanup: only the request that currently owns the
+      // controller may release the run lock, so a superseded/failed/aborted
+      // request can never strand the lock.
+      if (runControllerRef.current === controller) {
         runningRef.current = false
         runControllerRef.current = null
       }
@@ -465,7 +521,7 @@ export function QuantumLab() {
       </div>
 
       <div className="qlab-main-row">
-        <section className="qlab-new-circuit-section" aria-label="Circuit builder">
+        <section className="qlab-new-circuit-section" data-tutor-id="circuit-builder" aria-label="Circuit builder">
           <CircuitBuilder
             circuit={circuit}
             width={width}
@@ -483,7 +539,7 @@ export function QuantumLab() {
           />
         </section>
 
-        <aside className="qlab-code-drawer" data-mode={mode} aria-label="Code editor">
+        <aside className="qlab-code-drawer" data-mode={mode} data-tutor-id="code-editor" aria-label="Code editor">
           <CodePanel
             code={code}
             framework={framework}
@@ -491,6 +547,7 @@ export function QuantumLab() {
             error={codeError}
             onCodeChange={handleCodeChange}
             onFrameworkChange={handleFrameworkChange}
+            onEditorMount={handleEditorMount}
           />
         </aside>
       </div>
@@ -501,6 +558,7 @@ export function QuantumLab() {
           backend={backend}
           shots={shots}
           numQubits={numQubits}
+          circuitModified={circuitModified}
           onBackendChange={handleBackendChange}
           onShotsChange={handleShotsChange}
           onRun={handleRun}

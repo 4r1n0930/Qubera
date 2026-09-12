@@ -1,8 +1,40 @@
 import express from "express";
 import Progress from "../models/Progress.js";
-import { protect } from "../middleware/authMiddleware.js";
+import LearningEvent from "../models/LearningEvent.js";
+import protect from "../middleware/authMiddleware.js";
 
 const router = express.Router();
+
+// Record a lightweight learning event (AI tutor learning-event log)
+router.post("/learning-event", async (req, res) => {
+  try {
+    const { userId, topic, event, difficulty } = req.body;
+    if (!userId || !topic || !event) {
+      return res.status(400).json({
+        message: "userId, topic, and event are required",
+      });
+    }
+
+    const doc = await LearningEvent.create({
+      userId,
+      topic,
+      event,
+      difficulty: ["beginner", "intermediate", "advanced"].includes(difficulty)
+        ? difficulty
+        : "beginner",
+    });
+
+    res.status(201).json({
+      message: "Learning event recorded",
+      event: doc,
+    });
+  } catch (error) {
+    console.error("Learning event error:", error);
+    res.status(500).json({
+      message: "Server error",
+    });
+  }
+});
 
 // Update module progress
 router.put("/:moduleId", protect, async (req, res) => {

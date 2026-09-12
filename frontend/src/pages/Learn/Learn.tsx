@@ -8,11 +8,14 @@ import {
   AlertTriangle,
   Loader2,
   RefreshCw,
+  Sparkles,
 } from 'lucide-react'
 import remarkGfm from 'remark-gfm'
 import ReactMarkdown from 'react-markdown'
+import { useSearchParams } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { LearnCodeBlock } from '../../components/learn/LearnCodeBlock'
+import { clearTutorContext, setTutorContext } from '../../tutor/tutorContextStore'
 
 type Module = {
   _id: string
@@ -43,6 +46,32 @@ export function Learn() {
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [tutorDeepLink, setTutorDeepLink] = useState(false)
+
+  // The AI tutor escapes to /dashboard/learn?q=<topic> to open the relevant
+  // lesson. This pending key lets us select it once the module's lessons load.
+  const [pendingLesson, setPendingLesson] = useState<{
+    lessonId: string
+    moduleId: string
+  } | null>(null)
+
+  const [searchParams] = useSearchParams()
+
+  // Feed the tutor the lesson the learner is currently reading. Cleared again
+  // when they switch or leave, so the tutor never reasons about a stale lesson.
+  useEffect(() => {
+    if (!selectedLesson) return
+    const module = modules.find((m) => m._id === selectedLesson.moduleId)
+    setTutorContext({
+      lesson: {
+        id: selectedLesson._id,
+        title: selectedLesson.title,
+        content: selectedLesson.content,
+        topic: module?.title,
+      },
+    })
+    return () => clearTutorContext({ lesson: true })
+  }, [selectedLesson, modules])
 
   const loadLessons = async (moduleId: string) => {
     if (lessonsLoading[moduleId] || lessonsByModule[moduleId]) return
@@ -97,6 +126,52 @@ export function Learn() {
     fetchModules()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const selectLessonForTopic = async (topic: string) => {
+    setTutorDeepLink(true)
+
+    try {
+      const res = await fetch(`/api/modules/search?q=${encodeURIComponent(topic)}`)
+      if (!res.ok) return
+      const data = await res.json().catch(() => ({}))
+      const lesson: Lesson | undefined = Array.isArray(data?.lessons)
+        ? data.lessons[0]
+        : undefined
+      if (!lesson) return
+
+      setPendingLesson({ lessonId: lesson._id, moduleId: lesson.moduleId })
+      setExpandedModule(lesson.moduleId)
+      if (!lessonsByModule[lesson.moduleId]) {
+        loadLessons(lesson.moduleId)
+      }
+    } catch {
+      /* tutor deep-link is best-effort */
+    }
+  }
+
+  useEffect(() => {
+    const q = searchParams.get('q')
+    if (q) {
+      selectLessonForTopic(q)
+    } else {
+      setTutorDeepLink(false)
+      setPendingLesson(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
+  // Once the pending lesson's module finishes loading, select that lesson.
+  useEffect(() => {
+    if (!pendingLesson) return
+    const list = lessonsByModule[pendingLesson.moduleId]
+    if (!list) return
+    const match = list.find((l) => l._id === pendingLesson.lessonId)
+    if (match) {
+      setSelectedLesson(match)
+      setTutorDeepLink(false)
+      setPendingLesson(null)
+    }
+  }, [lessonsByModule, pendingLesson])
 
   const handleModuleClick = (moduleId: string) => {
     if (expandedModule === moduleId) {
@@ -249,6 +324,12 @@ export function Learn() {
       </aside>
 
       <section className="learn-panel learn-reader" aria-live="polite">
+        {tutorDeepLink && (
+          <div className="learn-tutor-strip">
+            <Sparkles size={15} />
+            Berry is finding the right lesson for you…
+          </div>
+        )}
         {selectedLesson ? (
           <article>
             <h2 className="learn-reader-title">{selectedLesson.title}</h2>

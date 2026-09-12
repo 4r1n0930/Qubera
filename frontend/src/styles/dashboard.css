@@ -224,33 +224,6 @@
   border-bottom: 1px solid var(--color-hairline);
 }
 
-.dash-topbar-search {
-  flex: 1;
-  max-width: 460px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 14px;
-  background: #ffffff;
-  border: 1px solid var(--color-cardborder);
-  border-radius: 12px;
-  color: var(--color-inkmuted);
-}
-
-.dash-topbar-search input {
-  flex: 1;
-  border: none;
-  outline: none;
-  background: transparent;
-  font-size: 0.9rem;
-  color: var(--color-ink);
-}
-
-.dash-topbar-search:focus-within {
-  border-color: var(--color-sage);
-  box-shadow: 0 0 0 3px rgba(109, 146, 125, 0.18);
-}
-
 .dash-topbar-actions {
   margin-left: auto;
   display: flex;
@@ -374,9 +347,20 @@
 }
 
 /* ----------------------------- Content area ----------------------------- */
+#main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .dash-content {
-  padding: 28px;
-  max-width: 1240px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: clamp(16px, 2.4vw, 28px);
+  max-width: 1600px;
   width: 100%;
   margin: 0 auto;
 }
@@ -731,7 +715,15 @@
 
 /* ------------------------------- Placeholder ----------------------------- */
 .dash-page {
+  flex: 1;
+  min-width: 0;
   animation: dash-fade var(--transition-base);
+}
+
+.dash-page:has(.placeholder-card) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 @keyframes dash-fade {
@@ -800,7 +792,9 @@
 .learn-modules {
   position: sticky;
   top: 76px;
-  max-height: calc(100vh - 84px);
+  height: calc(100vh - 84px);
+  min-height: 0;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -823,14 +817,36 @@
 
 .learn-module-list {
   overflow-y: auto;
+  min-height: 0;
   padding: 10px;
-  flex: 1;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: #2f6b57 transparent;
+}
+
+.learn-module-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.learn-module-list::-webkit-scrollbar-track {
+  background: rgba(47, 107, 87, 0.08);
+  border-radius: 8px;
+}
+
+.learn-module-list::-webkit-scrollbar-thumb {
+  background: #2f6b57;
+  border-radius: 8px;
+}
+
+.learn-module-list::-webkit-scrollbar-thumb:hover {
+  background: #125246;
 }
 
 .learn-module {
+  flex-shrink: 0;
   border: 1px solid var(--color-hairline);
   border-radius: 12px;
   background: #fff;
@@ -1305,6 +1321,7 @@
 
   .learn-modules {
     position: static;
+    height: auto;
     max-height: none;
     overflow: visible;
   }
@@ -1357,9 +1374,6 @@
   .dash-hero {
     padding: 22px;
   }
-  .dash-topbar-search {
-    max-width: none;
-  }
   .dash-topbar-streak {
     display: none;
   }
@@ -1384,8 +1398,5 @@
 @media (max-width: 520px) {
   .stat-grid {
     grid-template-columns: 1fr 1fr;
-  }
-  .dash-topbar-search {
-    display: none;
   }
 }

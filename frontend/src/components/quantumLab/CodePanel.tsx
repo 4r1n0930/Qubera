@@ -1,5 +1,5 @@
 import { AlertCircle, CheckCircle2, Code2, Loader2 } from 'lucide-react'
-import { Editor } from '@monaco-editor/react'
+import { Editor, type OnMount } from '@monaco-editor/react'
 import type { CodeError, Framework } from '../../types/quantumLab'
 import { FRAMEWORKS, FRAMEWORK_LABELS } from '../../types/quantumLab'
 
@@ -10,6 +10,7 @@ export interface CodePanelProps {
   error?: CodeError | null
   onCodeChange: (code: string) => void
   onFrameworkChange: (framework: Framework) => void
+  onEditorMount?: OnMount
 }
 
 const FILE_NAMES: Record<Framework, string> = {
@@ -29,6 +30,7 @@ export function CodePanel({
   error,
   onCodeChange,
   onFrameworkChange,
+  onEditorMount,
 }: CodePanelProps) {
   const language = PYTHON.has(framework) ? 'python' : 'plaintext'
   const fileName = FILE_NAMES[framework]
@@ -66,6 +68,7 @@ export function CodePanel({
           language={language}
           value={code}
           onChange={(value) => onCodeChange(value ?? '')}
+          onMount={onEditorMount}
           loading={
             <div className="qlab-code-loading">
               <Code2 size={18} />

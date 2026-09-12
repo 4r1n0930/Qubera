@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom'
+import { useEffect } from 'react'
+import { setTutorContext } from '../../tutor/tutorContextStore'
 import {
   Atom,
   TrendingUp,
@@ -80,6 +82,18 @@ const recentActivity = [
 
 export function Progress() {
   const maxXp = 400 // fixed scale like image (0-400)
+
+  // Give the tutor a lightweight read on the learner's standing so it can
+  // answer "What should I learn next?" and "Where am I struggling?".
+  useEffect(() => {
+    setTutorContext({
+      userProgress: {
+        completedLessons: 0,
+        currentTopic: 'Quantum Circuits',
+        difficulty: 'Intermediate',
+      },
+    })
+  }, [])
 
   return (
     <div className="dash-page" style={{ display: 'grid', gap: 18 }}>

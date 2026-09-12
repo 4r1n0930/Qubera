@@ -149,6 +149,7 @@ VISUALIZATION_STATES = [
     pytest.param("Z", [], (0.0, 0.0, 1.0), id="Z"),
     pytest.param("S", [], (0.0, 0.0, 1.0), id="S"),
     pytest.param("T", [], (0.0, 0.0, 1.0), id="T"),
+    pytest.param("SX", [], (0.0, -1.0, 0.0), id="SX"),
     pytest.param("RX", [math.pi / 4], (0.0, -math.sin(math.pi / 4), math.cos(math.pi / 4)), id="RX-pi-4"),
     pytest.param("RY", [math.pi / 4], (math.sin(math.pi / 4), 0.0, math.cos(math.pi / 4)), id="RY-pi-4"),
 ]

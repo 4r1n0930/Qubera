@@ -16,6 +16,7 @@ GATE_MAP = {
     "Sdg": "sdg",
     "T": "t",
     "Tdg": "tdg",
+    "SX": "sx",
     "RX": "rx",
     "RY": "ry",
     "RZ": "rz",

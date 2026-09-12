@@ -10,14 +10,15 @@ interface CircuitBuilderProps {
   numQubits: number
   selectedGateId: string | null
   highlightedGateId: string | null
-  onAddGate: (gate: GateType, targets: number[], column: number) => void
-  onMoveGate: (id: string, targets: number[], column: number) => void
-  onRemoveGate: (id: string) => void
-  onSelectGate: (id: string | null) => void
-  onAddQubit: () => void
-  onRemoveQubit: () => void
-  onReorderWires: (from: number, to: number) => void
-  onClear: () => void
+  onAddGate?: (gate: GateType, targets: number[], column: number) => void
+  onMoveGate?: (id: string, targets: number[], column: number) => void
+  onRemoveGate?: (id: string) => void
+  onSelectGate?: (id: string | null) => void
+  onAddQubit?: () => void
+  onRemoveQubit?: () => void
+  onReorderWires?: (from: number, to: number) => void
+  onClear?: () => void
+  editable?: boolean
 }
 
 const CELL_W = 68
@@ -39,6 +40,7 @@ export function CircuitBuilder({
   onRemoveQubit,
   onReorderWires,
   onClear,
+  editable = true,
 }: CircuitBuilderProps) {
   const [viewX, setViewX] = useState(0)
   const [viewY, setViewY] = useState(0)
@@ -125,6 +127,7 @@ export function CircuitBuilder({
   // ---- Drop a gate onto a wire slot ----
   const handleDrop = useCallback(
     (e: React.DragEvent, qubit: number, column: number) => {
+      if (!editable) return
       e.preventDefault()
       const makeTargets = (req: number): number[] | null => {
         if (qubit + req > numQubits) return null
@@ -137,7 +140,7 @@ export function CircuitBuilder({
         try {
           const parsed = JSON.parse(moveRaw) as { id: string; qubits: number }
           const targets = makeTargets(parsed.qubits)
-          if (targets) onMoveGate(parsed.id, targets, column)
+          if (targets && onMoveGate) onMoveGate(parsed.id, targets, column)
         } catch {
           // ignore invalid payload
         }
@@ -153,21 +156,22 @@ export function CircuitBuilder({
           qubits: number
         }
         const targets = makeTargets(parsed.qubits)
-        if (targets) onAddGate(parsed.type, targets, column)
+        if (targets && onAddGate) onAddGate(parsed.type, targets, column)
       } catch {
         // ignore invalid payload
       }
     },
-    [numQubits, onAddGate, onMoveGate]
+    [editable, numQubits, onAddGate, onMoveGate]
   )
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
+    if (!editable) return
     e.preventDefault()
     const types = Array.from(e.dataTransfer.types)
     e.dataTransfer.dropEffect = types.includes('application/x-quantum-gate-move')
       ? 'move'
       : 'copy'
-  }, [])
+  }, [editable])
 
   const getOpAt = useCallback(
     (qubit: number, moment: number): GateOperation | undefined =>
@@ -180,29 +184,36 @@ export function CircuitBuilder({
   // ---- Wire drag reorder ----
   const wireDragRef = useRef<number | null>(null)
   const handleWireDragStart = useCallback((e: React.DragEvent, idx: number) => {
+    if (!editable) {
+      e.preventDefault()
+      return
+    }
     wireDragRef.current = idx
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('application/x-qubit-reorder', String(idx))
-  }, [])
+  }, [editable])
   const handleWireDrop = useCallback(
     (e: React.DragEvent, targetIdx: number) => {
+      if (!editable) return
       e.preventDefault()
       const raw = e.dataTransfer.getData('application/x-qubit-reorder')
       if (raw !== '') {
         const from = Number(raw)
-        if (!Number.isNaN(from)) onReorderWires(from, targetIdx)
+        if (!Number.isNaN(from) && onReorderWires) onReorderWires(from, targetIdx)
       }
       wireDragRef.current = null
     },
-    [onReorderWires]
+    [editable, onReorderWires]
   )
 
   return (
-    <div className="qlab-new-layout">
-      {/* Gate palette — outside the canvas */}
-      <div className="qlab-new-palette">
-        <GatePalette />
-      </div>
+    <div className={`qlab-new-layout ${!editable ? 'is-readonly' : ''}`}>
+      {/* Gate palette — outside the canvas, only shown when editable */}
+      {editable && (
+        <div className="qlab-new-palette">
+          <GatePalette />
+        </div>
+      )}
 
       <div className="qlab-new-builder">
         {/* Pannable canvas */}
@@ -237,15 +248,15 @@ export function CircuitBuilder({
             <div
               key={qIdx}
               className="qlab-new-wire"
-              onDragOver={(e) => e.preventDefault()}
+              onDragOver={(e) => editable && e.preventDefault()}
               onDrop={(e) => handleWireDrop(e, qIdx)}
             >
               <div
-                className="qlab-new-wire-label"
-                draggable
+                className={`qlab-new-wire-label ${!editable ? 'is-readonly' : ''}`}
+                draggable={editable}
                 onDragStart={(e) => handleWireDragStart(e, qIdx)}
                 onDragEnd={() => (wireDragRef.current = null)}
-                title="Drag to reorder wire"
+                title={editable ? 'Drag to reorder wire' : `Qubit wire q${qIdx}`}
               >
                 <span className="qlab-new-qubit-name">q{qIdx}</span>
                 <span className="qlab-new-qubit-state">|0⟩</span>
@@ -260,7 +271,7 @@ export function CircuitBuilder({
                       className="qlab-new-cell"
                       onDragOver={handleDragOver}
                       onDrop={(e) => handleDrop(e, qIdx, mIdx)}
-                      onClick={() => (op ? onSelectGate(op.id) : onSelectGate(null))}
+                      onClick={() => (op ? onSelectGate?.(op.id) : onSelectGate?.(null))}
                     >
                       {op && (
                         <GateNode
@@ -268,10 +279,12 @@ export function CircuitBuilder({
                           qubitIndex={qIdx}
                           isSelected={selectedGateId === op.id}
                           isHighlighted={highlightedGateId === op.id}
-                          onSelect={() => onSelectGate(op.id)}
-                          onDelete={() => onRemoveGate(op.id)}
+                          onSelect={() => onSelectGate?.(op.id)}
+                          onDelete={onRemoveGate ? () => onRemoveGate(op.id) : undefined}
+                          editable={editable}
                         />
-                      )}                    </div>
+                      )}
+                    </div>
                   )
                 })}
               </div>
@@ -291,40 +304,48 @@ export function CircuitBuilder({
         </div>
       </div>
 
-      {/* Fixed bottom bar (add qubit / clear) */}
+      {/* Fixed bottom bar (add qubit / clear or read-only status) */}
       <div className="qlab-new-addbar">
-        <div className="qlab-new-addbar-left">
-          <button
-            type="button"
-            className="qlab-new-btn qlab-new-btn-sm"
-            onClick={onAddQubit}
-            disabled={numQubits >= 8}
-            title="Add qubit wire"
-          >
-            <Plus size={12} />
-            <span>Add Qubit</span>
-          </button>
-          <button
-            type="button"
-            className="qlab-new-btn qlab-new-btn-sm"
-            onClick={onRemoveQubit}
-            disabled={numQubits <= 1}
-            title="Remove last qubit wire"
-          >
-            <Minus size={12} />
-            <span>Remove Qubit</span>
-          </button>
-          <button
-            type="button"
-            className="qlab-new-btn qlab-new-btn-sm qlab-new-btn-danger"
-            onClick={onClear}
-            disabled={circuit.operations.length === 0}
-            title="Clear all gates"
-          >
-            <Trash2 size={12} />
-            <span>Clear</span>
-          </button>
-        </div>
+        {editable ? (
+          <div className="qlab-new-addbar-left">
+            <button
+              type="button"
+              className="qlab-new-btn qlab-new-btn-sm"
+              onClick={onAddQubit}
+              disabled={numQubits >= 8}
+              title="Add qubit wire"
+            >
+              <Plus size={12} />
+              <span>Add Qubit</span>
+            </button>
+            <button
+              type="button"
+              className="qlab-new-btn qlab-new-btn-sm"
+              onClick={onRemoveQubit}
+              disabled={numQubits <= 1}
+              title="Remove last qubit wire"
+            >
+              <Minus size={12} />
+              <span>Remove Qubit</span>
+            </button>
+            <button
+              type="button"
+              className="qlab-new-btn qlab-new-btn-sm qlab-new-btn-danger"
+              onClick={onClear}
+              disabled={circuit.operations.length === 0}
+              title="Clear all gates"
+            >
+              <Trash2 size={12} />
+              <span>Clear</span>
+            </button>
+          </div>
+        ) : (
+          <div className="qlab-new-addbar-left">
+            <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 500 }}>
+              Circuit is read-only for this challenge
+            </span>
+          </div>
+        )}
         <div className="qlab-new-addbar-right">
           <span className="qlab-new-qubits-count">
             {numQubits} qubit{numQubits > 1 ? 's' : ''}
@@ -361,13 +382,15 @@ function GateNode({
   isHighlighted,
   onSelect,
   onDelete,
+  editable = true,
 }: {
   op: GateOperation
   qubitIndex: number
   isSelected: boolean
   isHighlighted: boolean
   onSelect: () => void
-  onDelete: () => void
+  onDelete?: () => void
+  editable?: boolean
 }) {
   const definition = GATE_CATALOG.find((g) => g.type === op.gate)
   const role = gateRole(op, qubitIndex)
@@ -380,6 +403,7 @@ function GateNode({
     role === 'box' || role === 'measure' ? 'qlab-node-box' : '',
     isSelected ? 'is-selected' : '',
     isHighlighted ? 'is-highlighted' : '',
+    !editable ? 'is-readonly' : '',
   ]
     .filter(Boolean)
     .join(' ')
@@ -390,6 +414,10 @@ function GateNode({
   }
 
   const handleDragStart = (e: React.DragEvent) => {
+    if (!editable) {
+      e.preventDefault()
+      return
+    }
     e.stopPropagation()
     e.dataTransfer.setData(
       'application/x-quantum-gate-move',
@@ -417,12 +445,12 @@ function GateNode({
     <div
       className={classes}
       onClick={handleClick}
-      draggable
+      draggable={editable}
       onDragStart={handleDragStart}
       title={`${definition?.name ?? op.gate} ${op.targets.length > 1 ? `[${op.targets.join(',')}]` : ''}`}
     >
       {content}
-      {isSelected && (isFirst || op.targets.length === 1) && (
+      {editable && isSelected && (isFirst || op.targets.length === 1) && onDelete && (
         <button
           type="button"
           className="qlab-node-delete-btn"

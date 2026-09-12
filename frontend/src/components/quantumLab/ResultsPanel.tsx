@@ -1,11 +1,24 @@
 import { useMemo, useState } from 'react'
-import { Activity, Loader2, Minus, Play, Plus } from 'lucide-react'
+import { Activity, Clock, Loader2, Minus, Play, Plus } from 'lucide-react'
 import type { ExecutionState } from '../../types/quantumLab'
 import type { QuantumBackend, ComplexAmplitude } from '../../api/quantumApi'
 import type { QubitVisualization } from '../../utils/blochMath'
 import { deriveQubitVisualization, deriveAllQubitVisualizations } from '../../utils/blochMath'
 import { BlochSphere } from './BlochSphere'
 import { StateVectorVisualization } from './StateVectorVisualization'
+
+function formatExecutionTime(elapsedMs?: number | null): string {
+  if (elapsedMs === undefined || elapsedMs === null || isNaN(elapsedMs)) {
+    return '—'
+  }
+  if (elapsedMs < 0.01) {
+    return '< 0.01 ms'
+  }
+  if (elapsedMs < 1000) {
+    return `${elapsedMs.toFixed(2)} ms`
+  }
+  return `${(elapsedMs / 1000).toFixed(2)} s`
+}
 
 type ViewType = 'pd' | 'bs' | 'sv'
 
@@ -20,6 +33,8 @@ interface ResultsPanelProps {
   backend: QuantumBackend
   shots: number
   numQubits: number
+  /** Whether the live circuit has diverged from the last executed circuit. */
+  circuitModified?: boolean
   onBackendChange: (b: QuantumBackend) => void
   onShotsChange: (s: number) => void
   onRun: () => void
@@ -47,6 +62,7 @@ export function ResultsPanel({
   backend,
   shots,
   numQubits,
+  circuitModified = false,
   onBackendChange,
   onShotsChange,
   onRun,
@@ -62,24 +78,36 @@ export function ResultsPanel({
   const result = executionState.status === 'success' ? executionState.result : undefined
   const blochVectors = result?.bloch_vectors
 
-  const activeIdx = selectedQubit === 'all' ? 0 : selectedQubit
+  // The number of qubits the RESULT represents (authoritative from the last
+  // execution). Never the live builder count: a later edit to the circuit must
+  // not reshape or restretch the stored simulator output.
+  const resultNumQubits = result?.num_qubits ?? numQubits
+
+  const hasBlochData = Boolean(result?.bloch_vectors ?? result?.statevector)
+
+  const activeIdx =
+    selectedQubit === 'all' ? 0 : Math.min(selectedQubit, Math.max(0, resultNumQubits - 1))
 
   // The selected qubit's Bloch state, derived from the authoritative backend output
   const info: QubitVisualization = deriveQubitVisualization({
     vector: blochVectors?.[`q${activeIdx}`],
     statevector: result?.statevector,
     qubit: activeIdx,
-    numQubits,
+    numQubits: resultNumQubits,
   })
 
-  // Visualizations for all circuit qubits simultaneously
+  // Visualizations for all qubits the last execution produced, simultaneously
   const allQubits: QubitVisualization[] = useMemo(() => {
-    return deriveAllQubitVisualizations(numQubits, blochVectors, result?.statevector)
-  }, [numQubits, blochVectors, result?.statevector])
+    return deriveAllQubitVisualizations(
+      resultNumQubits,
+      blochVectors,
+      result?.statevector
+    )
+  }, [resultNumQubits, blochVectors, result?.statevector])
 
   return (
     <div className="qlab-results">
-      {/* Single slim toolbar — controls + view selector in one row */}
+      {/* Single slim toolbar — controls + view selector + execution status in one row */}
       <div className="qlab-results-toolbar">
         <div className="qlab-toolbar-left">
           <div className="qlab-toolbar-group">
@@ -132,6 +160,7 @@ export function ResultsPanel({
             <button
               type="button"
               className="qlab-run-btn-compact"
+              data-tutor-id="run-circuit"
               onClick={onRun}
               disabled={isRunning}
               aria-label="Run circuit"
@@ -167,25 +196,79 @@ export function ResultsPanel({
             </select>
           </div>
         </div>
+
+        {/* Execution status — top-right of the results header (PART 3) */}
+        <div className="qlab-toolbar-right">
+          {isRunning ? (
+            <span
+              className="qlab-toolbar-status qlab-toolbar-status-running"
+              role="status"
+              aria-label="Simulation running"
+            >
+              <Loader2 size={12} className="qlab-spin" />
+              Running…
+            </span>
+          ) : (
+            result && (
+              <span
+                className="qlab-toolbar-status"
+                role="status"
+                aria-label="Simulation Execution Time"
+              >
+                {circuitModified && (
+                  <span
+                    className="qlab-stale-chip"
+                    title="The circuit has been edited since this run. Results show the last execution."
+                  >
+                    Circuit edited
+                  </span>
+                )}
+                <Clock size={12} className="qlab-time-icon" />
+                <span className="qlab-toolbar-time">
+                  Simulation Time:
+                  <span className="qlab-time-val">
+                    {formatExecutionTime(result.elapsed_time_ms)}
+                  </span>
+                </span>
+                <span className="qlab-time-note">
+                  {result.backend} · {result.shots.toLocaleString('en-US')} shots
+                </span>
+              </span>
+            )
+          )}
+        </div>
       </div>
 
       {/* Single visualization stage — fills remaining space */}
       <div className="qlab-results-stage">
         {view === 'pd' && <PDView state={executionState} />}
-        {view === 'bs' && (
-          <BSView
-            numQubits={numQubits}
-            selectedQubit={selectedQubit}
-            setSelectedQubit={setSelectedQubit}
-            info={info}
-            allQubits={allQubits}
-            statevector={result?.statevector}
-          />
-        )}
+        {view === 'bs' &&
+          (result && !hasBlochData ? (
+            <div className="qlab-results-error" role="status">
+              <p className="qlab-results-error-title">Bloch &amp; Q-Sphere unavailable</p>
+              <p className="qlab-results-error-desc">
+                These views need the exact statevector (or bloch vectors), which is not
+                well defined for circuits with mid-circuit resets. This run returned
+                counts and probabilities only.
+              </p>
+            </div>
+          ) : (
+            <BSView
+              numQubits={resultNumQubits}
+              selectedQubit={
+                selectedQubit === 'all' ? 'all' : Math.min(selectedQubit, resultNumQubits - 1)
+              }
+              setSelectedQubit={setSelectedQubit}
+              info={info}
+              allQubits={allQubits}
+              statevector={result?.statevector}
+            />
+          ))}
         {view === 'sv' && (
           <StateVectorVisualization
             statevector={result?.statevector}
             counts={result?.counts}
+            probabilities={result?.probabilities}
             shots={result?.shots}
           />
         )}
