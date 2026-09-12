@@ -1,5 +1,6 @@
 export { QuantumTutor } from './QuantumTutor'
 export { TutorButton } from './TutorButton'
+export { TutorCompanion } from './TutorCompanion'
 export { TutorPanel } from './TutorPanel'
 export { TutorMessages } from './TutorMessages'
 export { TutorInput } from './TutorInput'

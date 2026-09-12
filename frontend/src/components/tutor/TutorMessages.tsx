@@ -38,13 +38,21 @@ export function TutorMessages({ messages, isThinking, error, onSpeak }: TutorMes
 
   return (
     <div className="qut-messages" ref={scrollRef}>
-      {messages.map((message) =>
+      {messages.map((message, index) =>
         message.sender === 'user' ? (
-          <div key={message.id} className="qut-bubble qut-bubble-user">
+          <div
+            key={message.id}
+            className="qut-bubble qut-bubble-user"
+            style={{ animationDelay: `${Math.min(index, 6) * 45}ms` }}
+          >
             {message.text}
           </div>
         ) : (
-          <div key={message.id} className="qut-bubble qut-bubble-tutor">
+          <div
+            key={message.id}
+            className="qut-bubble qut-bubble-tutor"
+            style={{ animationDelay: `${Math.min(index, 6) * 45}ms` }}
+          >
             <span className="qut-bubble-text">{message.text || '\u00a0'}</span>
             {!message.pending && message.text && (
               <button
